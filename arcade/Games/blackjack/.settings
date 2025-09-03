@@ -1,0 +1,16 @@
+{
+  debug = false,
+  maxBet = 5,
+  enableTouch = false,
+  cost = 10,
+  description = "Blackjack Deluxe",
+  author = "jakejakey",
+  BankServer = "BankServer18",
+  [ "motd.path" ] = "/rom/motd.txt:/motd.txt:/rom/cccbridge_motd.txt",
+  launcher = "blackjack",
+  inputHopper = "minecraft:hopper_7",
+  clientName = "Blackjack1",
+  outputDropper = "minecraft:dropper_6",
+  diskdrive = "drive_10",
+  gameName = "Blackjack",
+}
