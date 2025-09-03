@@ -10,9 +10,11 @@ local code = 0
 local wirelessModemSide = "left"
 local modemSide = "bottom"
 local monitorSide = "back"
+local chatboxSide = "top"
 local controllerSocket
 local monitor = peripheral.wrap(monitorSide)
 local modem = peripheral.wrap(wirelessModemSide)
+local chatbox = peripheral.wrap(chatboxSide)
 
 monitor.setTextScale(1)
 
@@ -28,6 +30,10 @@ settings.define("cost",
     { description = "amount of credits it costs to play game", default = 1, type = "number" })
 settings.define("description",
     { description = "Game description", default = "A cool game", type = "string" })
+settings.define("password",
+    { description = "password used for this host", default = "password", type = "string" })
+settings.define("author",
+    { description = "game author", default = "Schindler", type = "string" })
 
 --Settings fails to load
 if settings.load() == false then
@@ -38,6 +44,8 @@ if settings.load() == false then
     settings.set("launcher", "game")
     settings.set("description", "A cool game")
     settings.set("cost", 1)
+    settings.set("password", "password")
+    settings.set("author", "Schindler")
     settings.set("debug", false)
     print("Stop the host and edit .settings file with correct settings")
     settings.save()
@@ -66,7 +74,7 @@ function checkUpdates()
     print("Checking for updates")
     -- Set the GitHub repository information
     local owner = "schindlershadow"
-    local repo = "ComputerCraft-Schindler-Bank"
+    local repo = "ComputerCraft-Schindler-Bank-RealEconomy"
 
     -- Set the script file information
     local filepath = "startup.lua"
@@ -311,14 +319,14 @@ local function userMenu()
         monitor.setBackgroundColor(colors.blue)
         centerText("User: " .. tostring(controllerSocket.username))
         monitor.setCursorPos(1, 3)
-        centerText("Credits: \167" .. tostring(credits))
+        centerText("Dollars: \167" .. tostring(credits))
         monitor.setCursorPos(1, 5)
         if settings.get("cost") <= 0 then
             centerText("Free to play")
         elseif settings.get("cost") == 1 then
-            centerText("\167" .. tostring(settings.get("cost")) .. " Credit, 1 Play")
+            centerText("\167" .. tostring(settings.get("cost")) .. " Dollar, 1 Play")
         else
-            centerText("\167" .. tostring(settings.get("cost")) .. " Credits, 1 Play")
+            centerText("\167" .. tostring(settings.get("cost")) .. " Dollars, 1 Play")
         end
 
         monitor.setBackgroundColor(colors.green)
@@ -704,12 +712,13 @@ local function startupProgram()
 end
 
 loadingScreen("Arcade is loading")
-checkUpdates()
+
 
 print("Client is loading, please wait....")
 
 --Staggered launch
 if not settings.get("debug") then
+    checkUpdates()
     sleep((1 + math.random(30)))
 end
 

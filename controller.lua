@@ -444,6 +444,14 @@ local function loginMenu(serverName, code, serverType)
         login(serverSocket, username, password, code)
         return
     end
+    local loginCode = 0
+    cryptoNet.send(serverSocket, { "loginCode" })
+    local event, serverType
+    repeat
+        event, loginCode = os.pullEventRaw()
+    until event == "gotLoginCode"
+    debugLog("gotLoginCode: " .. tostring(serverType))
+
     local done = false
     local user = ""
     local pass = ""
@@ -508,7 +516,7 @@ local function loginMenu(serverName, code, serverType)
         border = 1
 
         term.setCursorPos(1, forth + 5)
-        centerText("Press \"TAB\" to switch")
+        --centerText("Press \"TAB\" to switch")
         term.setBackgroundColor(colors.white)
         term.setTextColor(colors.black)
         for i = border + 6, width - border - 1, 1 do
@@ -516,14 +524,14 @@ local function loginMenu(serverName, code, serverType)
             term.write(" ")
         end
         term.setCursorPos(border + 6, forth + 6)
-        term.write(user)
+        term.write(loginCode)
         term.setCursorPos(border + 1, forth + 6)
         if selectedField == "user" then
             term.setBackgroundColor(colors.green)
         else
             term.setBackgroundColor(colors.lightGray)
         end
-        print("User:")
+        print("Code:")
 
         term.setBackgroundColor(colors.white)
         for i = border + 6, width - border - 1, 1 do
@@ -536,28 +544,18 @@ local function loginMenu(serverName, code, serverType)
             term.write("*")
         end
         term.setCursorPos(border + 1, forth + 8)
-        if selectedField == "pass" then
-            term.setBackgroundColor(colors.green)
-        else
-            term.setBackgroundColor(colors.lightGray)
-        end
-        print("Pass:")
+        
+        term.setBackgroundColor(colors.lightGray)
+        print("Enter this code in chat")
 
         term.setCursorPos(1, forth + 10)
         term.setBackgroundColor(colors.red)
         term.write(" Cancel ")
         term.setCursorPos(9, forth + 10)
-        if serverName ~= "LocalHost" and serverType == "ATM" then
-            term.setBackgroundColor(colors.blue)
-            term.write(" New (F1)  ")
-        end
+        
         term.setCursorPos(width - 6, forth + 10)
         term.setBackgroundColor(colors.green)
-        if serverName ~= "LocalHost" then
-            term.write(" Login ")
-        else
-            term.write(" Save  ")
-        end
+        
 
         local event, button, is_held
         repeat
@@ -863,21 +861,6 @@ local function onStart()
         centerText("Controller!")
         sleep(0)
         term.setCursorPos(1, 6)
-        if username == "" then
-            centerText("Not logged in!")
-            sleep(0)
-        else
-            centerText("Hello " .. username)
-            sleep(0)
-            term.setCursorPos(1, 7)
-            centerText("Your login is cached")
-            sleep(0)
-            if credits ~= -1 then
-                term.setCursorPos(1, 8)
-                centerText("Credits: \167" .. tostring(credits))
-                sleep(0)
-            end
-        end
         term.setCursorPos(1, 10)
         centerText("Please enter an option:")
         sleep(0)
@@ -889,9 +872,9 @@ local function onStart()
         sleep(0)
         term.setCursorPos(2, 13)
         if username ~= "" then
-            term.write("3) Logout")
+            --term.write("3) Logout")
         else
-            term.write("3) Cache login")
+            --term.write("3) Cache login")
         end
         term.setCursorPos(1, 20)
         term.write("ID:" .. os.getComputerID())
@@ -912,16 +895,6 @@ local function onStart()
         elseif key == keys.two or key == keys.numPad2 then
             drawHelp()
             drawTransition(colors.gray)
-        elseif key == keys.three or key == keys.numPad3 then
-            if username ~= "" then
-                username = ""
-                password = ""
-            else
-                sleep(0.2)
-                --Cache login
-                loginMenu("LocalHost", 0, "LocalHost")
-                drawTransition(colors.gray)
-            end
         end
     end
 end
