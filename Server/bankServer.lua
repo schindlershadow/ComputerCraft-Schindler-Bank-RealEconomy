@@ -57,7 +57,7 @@ os.loadAPI("cryptoNet");
 function checkUpdates()
 	print("Checking for updates");
 	local owner = "schindlershadow";
-	local repo = "ComputerCraft-Schindler-Bank";
+	local repo = "ComputerCraft-Schindler-Bank-RealEconomy"
 	local filepath = "startup.lua";
 	local commiturl = "https://api.github.com/repos/" .. owner .. "/" .. repo .. "/contents/" .. githubFolder .. "/" .. githubFilename;
 	local commitresponse = http.get(commiturl);

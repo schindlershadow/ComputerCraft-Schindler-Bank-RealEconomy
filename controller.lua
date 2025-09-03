@@ -46,7 +46,7 @@ function checkUpdates()
     print("Checking for updates")
     -- Set the GitHub repository information
     local owner = "schindlershadow"
-    local repo = "ComputerCraft-Schindler-Bank"
+    local repo = "ComputerCraft-Schindler-Bank-RealEconomy"
 
     -- Set the script file information
     local filepath = "startup.lua"
