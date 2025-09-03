@@ -163,42 +163,65 @@ end
 --Logs in using password hash
 --This allows multiple servers to use a central server as an auth server
 local function login(socket, user, pass, code)
-    local tmp = {}
-    tmp.username = user
-    tmp.password = pass
-    tmp.code = code
-    --log("hashLogin")
-    cryptoNet.send(socket, { "hashLogin", tmp })
-    --mark for garbage collection
-    tmp = nil
-    local event
-    local loginStatus = false
-    local permissionLevel = 0
-    timeoutConnect = os.startTimer(15)
-    repeat
-        event, loginStatus, permissionLevel = os.pullEvent("hashLogin")
-    until event == "hashLogin"
-    os.cancelTimer(timeoutConnect)
-    timeoutConnect = nil
-    debugLog("loginStatus:" .. tostring(loginStatus))
-    if loginStatus == true then
-        socket.username = user
-        socket.permissionLevel = permissionLevel
-        os.queueEvent("login", user, socket)
-        username = user
-        password = pass
-        pass = nil
-    else
-        pass = nil
-        term.setCursorPos(1, 1)
-        loadingScreen("Failed to login to Server")
-        --clear cached creds
-        username = ""
-        password = ""
-        sleep(5)
-        return
-    end
+    serverSocket = socket
+    --os.queueEvent("login", user, socket)
+    debugLog("Controls")
+    debugLog("requesting controls")
+        cryptoNet.send(serverSocket, { "getControls" })
+        local controlsEvent
+        local controls = {}
+        repeat
+            controlsEvent, controls = os.pullEventRaw()
+        until controlsEvent == "gotControls"
+        print("Connected!")
+        debugLog("Connected!")
 
+        term.setBackgroundColor(colors.black)
+        term.setTextColor(colors.white)
+        --term.clear()
+        drawTransition(colors.black)
+        term.setCursorPos(1, 1)
+        term.setBackgroundColor(colors.blue)
+        term.clearLine()
+        centerText("Schindler Controller")
+        sleep(0)
+        term.setCursorPos(1, 2)
+        term.setBackgroundColor(colors.gray)
+        term.clearLine()
+        centerText("Controls")
+        sleep(0)
+        term.setBackgroundColor(colors.black)
+        term.setCursorPos(1, 3)
+        --debugLog("controls:" .. textutils.serialise(controls))
+        for k, v in pairs(controls) do
+            if v ~= nil and v.key ~= nil and v.discription ~= nil then
+                print(tostring(v.discription) .. ": " .. tostring(v.key))
+                sleep(0)
+            end
+        end
+        while true do
+            if serverSocket ~= nil then
+                local event3, key, is_held
+                repeat
+                    event3, key, is_held = os.pullEventRaw()
+                until event3 == "key" or event3 == "key_up" or event3 == "char" or event3 == "exit"
+
+                if event3 == "exit" then
+                    return
+                elseif type(key) == "number" and keys.getName(key) ~= "nil" or event3 == "char" then
+                    if event3 == "key" then
+                        debugLog(("%s held=%s"):format(keys.getName(key), is_held))
+                        cryptoNet.send(serverSocket, { "keyPressed", { key, is_held } })
+                    elseif event3 == "key_up" then
+                        debugLog(keys.getName(key) .. " was released.")
+                        cryptoNet.send(serverSocket, { "keyReleased", { key } })
+                    elseif event3 == "char" then
+                        debugLog(key .. " char was pressed")
+                        cryptoNet.send(serverSocket, { "charPressed", { key } })
+                    end
+                end
+            end
+        end
     debugLog("Wait for the connection to finish")
     --Wait for the connection to finish
     --os.pullEvent("exit")
@@ -445,11 +468,12 @@ local function loginMenu(serverName, code, serverType)
         return
     end
     local loginCode = 0
+    debugLog("sending request for loginCode")
     cryptoNet.send(serverSocket, { "loginCode" })
     local event, serverType
     repeat
         event, loginCode = os.pullEventRaw()
-    until event == "gotLoginCode"
+    until event == "loginCode"
     debugLog("gotLoginCode: " .. tostring(loginCode))
 
     local done = false
@@ -539,10 +563,6 @@ local function loginMenu(serverName, code, serverType)
             term.write(" ")
         end
         term.setCursorPos(border + 6, forth + 8)
-        --write password sub text
-        for i = 1, string.len(pass), 1 do
-            term.write("*")
-        end
         term.setCursorPos(border + 1, forth + 8)
         
         term.setBackgroundColor(colors.lightGray)
@@ -556,89 +576,33 @@ local function loginMenu(serverName, code, serverType)
         term.setCursorPos(width - 6, forth + 10)
         term.setBackgroundColor(colors.green)
         
+        
 
         local event, button, is_held
         repeat
             event, button, is_held = os.pullEvent()
-        until event == "mouse_click" or event == "key" or event == "char"
+        until event == "mouse_click" or event == "key" or event == "userAuth"
 
-        if event == "char" then
-            local key = button
-            --search = search .. key
-            if selectedField == "user" then
-                user = user .. key
-            else
-                pass = pass .. key
-            end
-        elseif event == "key" then
+        if event == "key" then
             local key = button
             if key == keys.backspace then
-                --remove from text entry
-                if selectedField == "user" then
-                    if user == "" and is_held == false then
-                        if serverName ~= "LocalHost" then
-                            cryptoNet.send(serverSocket, { "cancelLogin" })
-                        end
-                        done = true
-                    end
-                    user = user:sub(1, -2)
-                else
-                    if pass == "" and is_held == false then
-                        if serverName ~= "LocalHost" then
-                            cryptoNet.send(serverSocket, { "cancelLogin" })
-                        end
-                        done = true
-                    end
-                    pass = pass:sub(1, -2)
-                end
-            elseif key == keys.enter or key == keys.numPadEnter then
-                if serverName ~= "LocalHost" then
-                    login(serverSocket, user, pass, code)
-                else
-                    --update cached creds
-                    username = user
-                    password = pass
-                end
-                done = true
-            elseif key == keys.tab then
-                --toggle user/pass text entry
-                if selectedField == "user" then
-                    selectedField = "pass"
-                else
-                    selectedField = "user"
-                end
-            elseif key == keys.f1 then
-                if serverName ~= "LocalHost" and serverType == "ATM" then
-                    newUserMenu(serverName, code)
-                    drawTransition(colors.gray)
-                end
+                cryptoNet.send(serverSocket, { "cancelLogin" })
             end
         elseif event == "mouse_click" then
             --log("mouse_click x" .. tostring(x) .. " y" .. tostring(y) .. " scroll: " .. tostring(scroll))
             if y == math.floor(height / 4) + 10 then
-                if (x > width - 6 and x < width - 6 + 15) then
-                    if serverName ~= "LocalHost" then
-                        login(serverSocket, user, pass, code)
-                    else
-                        --update cached creds
-                        username = user
-                        password = pass
-                    end
-                    done = true
-                elseif (x > 10 and x < 9 + 7) then
-                    --newuser
-                    if serverName ~= "LocalHost" and serverType == "ATM" then
-                        newUserMenu(serverName, code)
-                        drawTransition(colors.gray)
-                    end
-                elseif (x > 1 and x < 7) then
+                if (x > 1 and x < 7) then
                     --cancel
-                    if serverName ~= "LocalHost" then
-                        cryptoNet.send(serverSocket, { "cancelLogin" })
-                    end
+                    cryptoNet.send(serverSocket, { "cancelLogin" })
                     done = true
                 end
             end
+        elseif event == "userAuth" then
+            local user = button
+            --os.queueEvent("login", user, serverSocket)
+            debugLog("userAuth")
+            login(serverSocket, user, loginCode)
+            done = true
         end
     end
     term.setTextColor(colors.white)
@@ -718,60 +682,7 @@ end
 
 local function onEvent(event)
     if event[1] == "login" then
-        cryptoNet.send(serverSocket, { "getControls" })
-        local controlsEvent
-        local controls = {}
-        repeat
-            controlsEvent, controls = os.pullEventRaw()
-        until controlsEvent == "gotControls"
-        print("Connected!")
-
-        term.setBackgroundColor(colors.black)
-        term.setTextColor(colors.white)
-        --term.clear()
-        drawTransition(colors.black)
-        term.setCursorPos(1, 1)
-        term.setBackgroundColor(colors.blue)
-        term.clearLine()
-        centerText("Schindler Controller")
-        sleep(0)
-        term.setCursorPos(1, 2)
-        term.setBackgroundColor(colors.gray)
-        term.clearLine()
-        centerText("Controls")
-        sleep(0)
-        term.setBackgroundColor(colors.black)
-        term.setCursorPos(1, 3)
-        --debugLog("controls:" .. textutils.serialise(controls))
-        for k, v in pairs(controls) do
-            if v ~= nil and v.key ~= nil and v.discription ~= nil then
-                print(tostring(v.discription) .. ": " .. tostring(v.key))
-                sleep(0)
-            end
-        end
-        while true do
-            if serverSocket ~= nil then
-                local event3, key, is_held
-                repeat
-                    event3, key, is_held = os.pullEventRaw()
-                until event3 == "key" or event3 == "key_up" or event3 == "char" or event3 == "exit"
-
-                if event3 == "exit" then
-                    return
-                elseif type(key) == "number" and keys.getName(key) ~= "nil" or event3 == "char" then
-                    if event3 == "key" then
-                        debugLog(("%s held=%s"):format(keys.getName(key), is_held))
-                        cryptoNet.send(serverSocket, { "keyPressed", { key, is_held } })
-                    elseif event3 == "key_up" then
-                        debugLog(keys.getName(key) .. " was released.")
-                        cryptoNet.send(serverSocket, { "keyReleased", { key } })
-                    elseif event3 == "char" then
-                        debugLog(key .. " char was pressed")
-                        cryptoNet.send(serverSocket, { "charPressed", { key } })
-                    end
-                end
-            end
-        end
+        
     elseif event[1] == "connection_closed" then
         --print(dump(event))
         --log(dump(event))
@@ -806,10 +717,14 @@ local function onEvent(event)
             os.queueEvent("gotTransfer", data)
         elseif message == "hashLogin" then
             os.queueEvent("hashLogin", event[2][2], event[2][3])
+        elseif message == "userAuth" then
+            os.queueEvent("userAuth", event[2][2], event[2][3])
         elseif message == "addUser" then
             os.queueEvent("gotAddUser", event[2][2], event[2][3])
         elseif message == "getServerType" then
             os.queueEvent("gotServerType", data)
+        elseif message == "loginCode" then 
+            os.queueEvent("loginCode", data)
         end
     elseif event[1] == "timer" then
         if event[2] == timeoutConnect then

@@ -4,17 +4,18 @@ local cryptoNetURL = "https://raw.githubusercontent.com/SiliconSloth/CryptoNet/m
 local timeoutConnect = nil
 local timeoutConnectController = nil
 local controllerTimer = nil
-local bankServerSocket = nil
 local credits = 0
 local code = 0
 local wirelessModemSide = "left"
 local modemSide = "bottom"
 local monitorSide = "back"
-local chatboxSide = "top"
+local chatboxSide = "right"
+local speakerSide = "top"
 local controllerSocket
 local monitor = peripheral.wrap(monitorSide)
 local modem = peripheral.wrap(wirelessModemSide)
 local chatbox = peripheral.wrap(chatboxSide)
+local speaker = peripheral.wrap(speakerSide)
 
 monitor.setTextScale(1)
 
@@ -25,13 +26,10 @@ settings.define("gameName",
 settings.define("launcher",
     { description = "The game launcher file", "game", type = "string" })
 settings.define("debug", { description = "Enables debug options", default = "false", type = "boolean" })
-settings.define("BankServer", { description = "bank server hostname", default = "minecraft:barrel_0", type = "string" })
 settings.define("cost",
     { description = "amount of credits it costs to play game", default = 1, type = "number" })
 settings.define("description",
     { description = "Game description", default = "A cool game", type = "string" })
-settings.define("password",
-    { description = "password used for this host", default = "password", type = "string" })
 settings.define("author",
     { description = "game author", default = "Schindler", type = "string" })
 
@@ -39,12 +37,10 @@ settings.define("author",
 if settings.load() == false then
     print("No settings have been found! Default values will be used!")
     settings.set("clientName", "client" .. tostring(os.getComputerID()))
-    settings.set("BankServer", "BankServer0")
     settings.set("gameName", "game")
     settings.set("launcher", "game")
     settings.set("description", "A cool game")
     settings.set("cost", 1)
-    settings.set("password", "password")
     settings.set("author", "Schindler")
     settings.set("debug", false)
     print("Stop the host and edit .settings file with correct settings")
@@ -142,6 +138,57 @@ function checkUpdates()
     end
 end
 
+--Play audioFile on speaker
+local function playAudio(audioFile)
+    if not fs.exists(audioFile) then
+        local url = "https://raw.githubusercontent.com/schindlershadow/ComputerCraft-Schindler-Bank/refs/heads/main/arcade/" .. audioFile
+        print("File not found locally. Attempting download: " .. url)
+
+        local response, err = http.get(url)
+        if response then
+            local content = response.readAll()
+            response.close()
+
+            local file = fs.open(audioFile, "w")
+            file.write(content)
+            file.close()
+
+            print("Downloaded and saved " .. audioFile)
+        else
+            print("Failed to download " .. audioFile .. ": " .. (err or "unknown error"))
+        end
+    end
+
+    local dfpwm = require("cc.audio.dfpwm")
+    local decoder = dfpwm.make_decoder()
+    for chunk in io.lines(audioFile, 16 * 1024) do
+        local buffer = decoder(chunk)
+        while not speaker.playAudio(buffer, 3) do
+            os.pullEvent("speaker_audio_empty")
+        end
+    end
+end
+
+--Play thank you audio
+local function playAudioExit()
+    playAudio("exit.dfpwm")
+end
+
+--Play new customer audio
+local function playAudioNewCustomer()
+    playAudio("new.dfpwm")
+end
+
+--Play returning customer audio
+local function playAudioReturningCustomer()
+    playAudio("returning.dfpwm")
+end
+
+--Play Deposit audio
+local function playAudioDepositAccepted()
+    playAudio("deposit.dfpwm")
+end
+
 --Dumps a table to string
 local function dump(o)
     if type(o) == "table" then
@@ -215,6 +262,7 @@ local function drawExit()
     monitor.setCursorPos(1, 3)
     monitor.setBackgroundColor(colors.blue)
     centerText("Thanks for playing!")
+    playAudioExit()
 end
 
 local function loadingScreen(text)
@@ -245,37 +293,56 @@ local function stopControllerTimer()
     controllerTimer = nil
 end
 
-local function getCredits()
-    credits = 0
-    local event
-    cryptoNet.send(bankServerSocket, { "getCredits", controllerSocket.username })
-    repeat
-        event, credits = os.pullEvent()
-    until event == "gotCredits"
-    return credits
-end
+local function getCredits(username)
+	if type(username) ~= "string" then
+		return 0;
+	end;
+	if creditsDB[username] ~= nil then
+		if creditsDB[username].username == username then
+			local _, out = commands.bal(username);
+			for _, line in ipairs(out) do
+				local amt = line:match("([%d%.]+)");
+				if amt then
+					return amt;
+				end;
+			end;
+		end;
+	end;
+	return 0;
+end;
 
-local function pay(amount)
-    local event
-    local status = false
-    local tmp = {}
-    tmp.username = controllerSocket.username
-    if amount == nil then
-        tmp.amount = settings.get("cost")
-    else
-        tmp.amount = tonumber(amount)
-    end
-    cryptoNet.send(bankServerSocket, { "pay", tmp })
-    repeat
-        event, status = os.pullEvent()
-    until event == "gotPay"
-    getCredits()
-    return status
+local function addCredits(username, value)
+	if type(username) ~= "string" then
+		return false;
+	end;
+	if type(value) ~= "number" then
+		return false;
+	end;
+			commands.reco("add " .. username .. " Dollar " .. tostring(value))
+			writeDatabase();
+			return true;
+
+end;
+
+local function pay(amount, username)
+    if type(username) == "string" and type(amount) == "number" then
+							local credits = getCredits(username);
+							if credits - amount >= 0 then
+								log("Credits change: user:" .. username .. " amount:" .. tostring((-1) * amount));
+								print("Credits change: user:" .. username .. " amount:" .. tostring((-1) * amount));
+								addCredits(username, (-1) * amount);
+                                playAudioDepositAccepted()
+                                return true
+							else
+                                return false
+							end;
+						
+						end;
 end
 
 local function playGame()
     local status = pay()
-    if status then
+    if settings.get("debug") or status  then
         monitor.setTextScale(0.5)
         shell.run("monitor", monitorSide, settings.get("launcher"))
         monitor.setTextColor(colors.white)
@@ -304,7 +371,7 @@ local function codeServer()
     end
 end
 
-local function userMenu()
+local function userMenu(username)
     local done = false
     while done == false do
         getCredits()
@@ -317,7 +384,7 @@ local function userMenu()
         centerText("Schindler Arcade:" .. settings.get("clientName"))
         monitor.setCursorPos(1, 2)
         monitor.setBackgroundColor(colors.blue)
-        centerText("User: " .. tostring(controllerSocket.username))
+        centerText("User: " .. tostring(username))
         monitor.setCursorPos(1, 3)
         centerText("Dollars: \167" .. tostring(credits))
         monitor.setCursorPos(1, 5)
@@ -457,27 +524,6 @@ local function drawMainMenu()
     end
 end
 
-local function getServerCert()
-    --Download the cert from the crafting server if it doesnt exist already
-    local filePath = settings.get("BankServer") .. ".crt"
-    if not fs.exists(filePath) then
-        print("Download the cert from the BankServer: " .. settings.get("BankServer") .. ".crt")
-        cryptoNet.send(bankServerSocket, { "getCertificate" })
-        --wait for reply from server
-        print("wait for reply from BankServer")
-        local event, data
-        repeat
-            event, data = os.pullEvent("gotCertificate")
-        until event == "gotCertificate"
-
-        print("write the cert file")
-        --write the file
-        local file = fs.open(filePath, "w")
-        file.write(data)
-        file.close()
-    end
-end
-
 --Cryptonet event handler
 local function onEvent(event)
     if event[1] == "login" then
@@ -488,27 +534,9 @@ local function onEvent(event)
         print(socket.username .. " just logged in.")
     elseif event[1] == "userAuth" then
         --getServerCert()
-        userMenu()
-    elseif message == "loginCode" then
-        local loginCode = math.random(1000, 9999)
-        cryptoNet.send(socket, { "loginCode", loginCode })
-        drawTransition(colors.green)
-        monitor.setCursorPos(1, 1)
-        monitor.setBackgroundColor(colors.black)
-        monitor.clearLine()
-        centerText("Schindler Arcade:" .. settings.get("clientName"))
-        monitor.setCursorPos(1, 3)
-        monitor.setBackgroundColor(colors.blue)
-        centerText("Please enter the following code")
-        monitor.setCursorPos(1, 5)
-        centerText("in minecraft chat")
-        monitor.setCursorPos(1, 6)
-        centerText(tostring(loginCode))
-        local event, username, chatMessage, uuid, isHidden
-        repeat
-            event, username, chatMessage, uuid, isHidden = os.pullEvent()
-        until event == "exit" or event == "timeoutConnectController" or event == "cancelLogin" or ( event == "chat" and chatMessage == tostring(loginCode))
-        os.queueEvent("userAuth", username, socket)
+        playAudioReturningCustomer()
+        userMenu(event[2])
+    
     elseif event[1] == "encrypted_message" then
         local socket = event[3]
 
@@ -519,6 +547,52 @@ local function onEvent(event)
             local message = event[2][1]
             local data = event[2][2]
             debugLog("User: " .. socket.username .. " Client: " .. socket.target .. " request: " .. tostring(message))
+            
+            
+            if message == "checkPasswordHashed" then
+                os.queueEvent("gotCheckPasswordHashed", data, event[2][3])
+            elseif message == "getCertificate" then
+                os.queueEvent("gotCertificate", data)
+            elseif message == "newID" then
+                os.queueEvent("gotNewID")
+            elseif message == "checkID" then
+                os.queueEvent("gotCheckID", data)
+            elseif message == "getCredits" then
+                os.queueEvent("gotCredits", data)
+                if controllerSocket ~= nil then
+                    cryptoNet.send(controllerSocket, { message, data })
+                end
+            elseif message == "pay" then
+                os.queueEvent("gotPay", data)
+            elseif message == "getValue" then
+                os.queueEvent("gotValue", data)
+            elseif message == "depositItems" then
+                os.queueEvent("gotDepositItems")
+            elseif message == "transfer" then
+                os.queueEvent("gotTransfer", data)
+                elseif message == "controllerConnect" then
+                if controllerSocket == nil then
+                    controllerSocket = socket
+                    os.cancelTimer(timeoutConnectController)
+                    timeoutConnectController = nil
+                    resetControllerTimer()
+                    print("Controller connected")
+                else
+                    print("Duplicate controller conection attempt!")
+                    log("Duplicate controller conection attempt!")
+                end
+            end
+
+            if controllerSocket ~= nil then
+                if socket.username == controllerSocket.username then
+                    resetControllerTimer()
+                end
+            end
+        else
+            --User is not logged in
+            local message = event[2][1]
+            local data = event[2][2]
+            debugLog("Client: " .. socket.target .. " request: " .. tostring(message))
             if message == "keyPressed" then
                 if type(data[1]) == "number" then
                     if keys.getName(data[1]) ~= "nil" then
@@ -542,19 +616,42 @@ local function onEvent(event)
                     debugLog("charPressed char" .. data[1])
                     os.queueEvent("char", data[1])
                 end
+            
             elseif message == "controllerConnect" then
-                if controllerSocket == nil then
-                    controllerSocket = socket
-                    os.cancelTimer(timeoutConnectController)
-                    timeoutConnectController = nil
-                    resetControllerTimer()
-                    print("Controller connected")
-                else
-                    print("Duplicate controller conection attempt!")
-                    log("Duplicate controller conection attempt!")
+                controllerSocket = socket
+                os.cancelTimer(timeoutConnectController)
+                timeoutConnectController = nil
+                resetControllerTimer()
+                print("Controller connected")
+            elseif message == "loginCode" then
+                local loginCode = math.random(1000, 9999)
+                debugLog("loginCode requested, generated: " .. tostring(loginCode))
+                print("loginCode requested, generated: " .. tostring(loginCode))
+                --local socket = event[3]
+                cryptoNet.send(socket, { "loginCode", loginCode })
+                drawTransition(colors.green)
+                monitor.setCursorPos(1, 1)
+                monitor.setBackgroundColor(colors.black)
+                monitor.clearLine()
+                centerText("Schindler Arcade:" .. settings.get("clientName"))
+                monitor.setCursorPos(1, 3)
+                monitor.setBackgroundColor(colors.green)
+                centerText("Please enter the following")
+                monitor.setCursorPos(1, 4)
+                centerText("code in chat")
+                monitor.setCursorPos(1, 6)
+                centerText(tostring(loginCode))
+                local event, username, chatMessage, uuid, isHidden
+                repeat
+                    event, username, chatMessage, uuid, isHidden = os.pullEvent()
+                until event == "exit" or event == "timeoutConnectController" or event == "cancelLogin" or ( event == "chat" and chatMessage == tostring(loginCode))
+                if event == "chat" and chatMessage == tostring(loginCode) then
+                    cryptoNet.send(socket, { "userAuth", username })
+                    os.queueEvent("userAuth", username, socket)
                 end
             elseif message == "getControls" then
                 print("Controls requested")
+                debugLog("Controls requested")
                 local file = fs.open("controls.db", "r")
                 local contents = file.readAll()
                 file.close()
@@ -562,91 +659,12 @@ local function onEvent(event)
                 local decoded = textutils.unserialize(contents)
                 if type(decoded) == "table" and next(decoded) then
                     print("Controls Found")
+                    debugLog("Controls Found")
                     cryptoNet.send(socket, { message, decoded })
                 else
                     print("Controls Not Found")
+                    debugLog("Controls Not Found")
                     cryptoNet.send(socket, { {} })
-                end
-            elseif message == "checkPasswordHashed" then
-                os.queueEvent("gotCheckPasswordHashed", data, event[2][3])
-            elseif message == "getCertificate" then
-                os.queueEvent("gotCertificate", data)
-            elseif message == "newID" then
-                os.queueEvent("gotNewID")
-            elseif message == "checkID" then
-                os.queueEvent("gotCheckID", data)
-            elseif message == "getCredits" then
-                os.queueEvent("gotCredits", data)
-                if controllerSocket ~= nil then
-                    cryptoNet.send(controllerSocket, { message, data })
-                end
-            elseif message == "pay" then
-                os.queueEvent("gotPay", data)
-            elseif message == "getValue" then
-                os.queueEvent("gotValue", data)
-            elseif message == "depositItems" then
-                os.queueEvent("gotDepositItems")
-            elseif message == "transfer" then
-                os.queueEvent("gotTransfer", data)
-            end
-
-            if controllerSocket ~= nil then
-                if socket.username == controllerSocket.username then
-                    resetControllerTimer()
-                end
-            end
-        else
-            --User is not logged in
-            local message = event[2][1]
-            local data = event[2][2]
-            debugLog("Client: " .. socket.target .. " request: " .. tostring(message))
-            if message == "controllerConnect" then
-                controllerSocket = socket
-                os.cancelTimer(timeoutConnectController)
-                timeoutConnectController = nil
-                resetControllerTimer()
-                print("Controller connected")
-            
-            elseif message == "hashLogin" then
-                --Need to auth with server
-                --debugLog("hashLogin")
-                print("User login request for: " .. data.username)
-                log("User login request for: " .. data.username)
-                local tmp = {}
-                tmp.username = data.username
-                tmp.passwordHash = cryptoNet.hashPassword(data.username, data.password, settings.get("BankServer"))
-                tmp.servername = data.servername
-                data.password = nil
-                cryptoNet.send(bankServerSocket, { "checkPasswordHashed", tmp })
-
-                local event2
-                local loginStatus = false
-                local permissionLevel = 0
-                repeat
-                    event2, loginStatus, permissionLevel = os.pullEvent("gotCheckPasswordHashed")
-                until event2 == "gotCheckPasswordHashed"
-                --debugLog("loginStatus:"..tostring(loginStatus))
-                if loginStatus == true then
-                    cryptoNet.send(socket, { "hashLogin", true, permissionLevel })
-                    socket.username = data.username
-                    socket.permissionLevel = permissionLevel
-
-                    --Update internal sockets
-                    for k, v in pairs(server.sockets) do
-                        if v.target == socket.target then
-                            server.sockets[k] = socket
-                            server.sockets[k].username = data.username
-                            break
-                        end
-                    end
-                    controllerSocket.username = data.username
-
-                    os.queueEvent("hash_login", socket.username, socket)
-                else
-                    print("User: " .. data.username .. " failed to login")
-                    log("User: " .. data.username .. " failed to login")
-                    os.queueEvent("cancelLogin")
-                    cryptoNet.send(socket, { "hashLogin", false })
                 end
             elseif message == "cancelLogin" then
                 print("cancelLogin")
@@ -713,20 +731,6 @@ local function onStart()
     width, height = monitor.getSize()
     --term.setTextScale(0.5)
     loadingScreen("Arcade is loading")
-
-    centerText("Connecting to server...")
-    log("Connecting to server: " .. settings.get("BankServer"))
-
-    cryptoNet.setLoggingEnabled(true)
-
-    timeoutConnect = os.startTimer(35)
-    bankServerSocket = cryptoNet.connect(settings.get("BankServer"), 30, 5, settings.get("BankServer") .. ".crt",
-        modemSide)
-    cryptoNet.login(bankServerSocket, "ARCADE", settings.get("password"))
-    print("Connected!")
-    --timeout no longer needed
-    timeoutConnect = nil
-    --getServerCert()
     server = cryptoNet.host(settings.get("clientName"), true, false, wirelessModemSide)
     rednet.open(wirelessModemSide)
     drawMainMenu()
