@@ -392,8 +392,12 @@ local function loginScreen()
     local event
     repeat
         event = os.pullEvent()
-    until event == "exit" or event == "timeoutConnectController" or event == "cancelLogin"
+    until event == "exit" or event == "timeoutConnectController" or event == "cancelLogin" or event == "loginCode"
     print("loginScreen exit reason: " .. tostring(event))
+
+    if event == "loginCode" then
+        os.queueEvent("loginCode")
+    end
 end
 
 local function drawMainMenu()
@@ -482,9 +486,28 @@ local function onEvent(event)
         local socket = event[3]
         -- The logged-in username is also stored in the socket
         print(socket.username .. " just logged in.")
-    elseif event[1] == "hash_login" then
-        getServerCert()
+    elseif event[1] == "userAuth" then
+        --getServerCert()
         userMenu()
+    elseif message == "loginCode" then
+        local loginCode = math.random(1000, 9999)
+        drawTransition(colors.green)
+        monitor.setCursorPos(1, 1)
+        monitor.setBackgroundColor(colors.black)
+        monitor.clearLine()
+        centerText("Schindler Arcade:" .. settings.get("clientName"))
+        monitor.setCursorPos(1, 3)
+        monitor.setBackgroundColor(colors.blue)
+        centerText("Please enter the following code")
+        monitor.setCursorPos(1, 5)
+        centerText("in minecraft chat")
+        monitor.setCursorPos(1, 6)
+        centerText(tostring(loginCode))
+        local event, username, chatMessage, uuid, isHidden
+        repeat
+            event, username, chatMessage, uuid, isHidden = os.pullEvent()
+        until event == "exit" or event == "timeoutConnectController" or event == "cancelLogin" or ( event == "chat" and chatMessage == tostring(loginCode))
+        os.queueEvent("userAuth", username, socket)
     elseif event[1] == "encrypted_message" then
         local socket = event[3]
 
@@ -582,6 +605,7 @@ local function onEvent(event)
                 timeoutConnectController = nil
                 resetControllerTimer()
                 print("Controller connected")
+            
             elseif message == "hashLogin" then
                 --Need to auth with server
                 --debugLog("hashLogin")
