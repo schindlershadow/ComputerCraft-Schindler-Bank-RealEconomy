@@ -450,7 +450,7 @@ local function loginMenu(serverName, code, serverType)
     repeat
         event, loginCode = os.pullEventRaw()
     until event == "gotLoginCode"
-    debugLog("gotLoginCode: " .. tostring(serverType))
+    debugLog("gotLoginCode: " .. tostring(loginCode))
 
     local done = false
     local user = ""

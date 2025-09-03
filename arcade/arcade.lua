@@ -491,6 +491,7 @@ local function onEvent(event)
         userMenu()
     elseif message == "loginCode" then
         local loginCode = math.random(1000, 9999)
+        cryptoNet.send(socket, { "loginCode", loginCode })
         drawTransition(colors.green)
         monitor.setCursorPos(1, 1)
         monitor.setBackgroundColor(colors.black)
