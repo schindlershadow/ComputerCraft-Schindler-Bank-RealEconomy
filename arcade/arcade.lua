@@ -744,6 +744,7 @@ local function onStart()
 	drawMainMenu();
 end;
 local function startupProgram()
+	print("Starting second monitor program: " .. tostring(settings.get("startupProgram")));
 	shell.run(settings.get("startupProgram"));
 end;
 loadingScreen("Arcade is loading");
