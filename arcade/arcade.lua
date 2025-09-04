@@ -62,6 +62,11 @@ settings.define("author", {
 	default = "Schindler",
 	type = "string"
 });
+settings.define("maxBet", {
+	description = "max bet allowed",
+	default = 1,
+	type = "number"
+});
 if settings.load() == false then
 	print("No settings have been found! Default values will be used!");
 	settings.set("clientName", "client" .. tostring(os.getComputerID()));
@@ -71,7 +76,8 @@ if settings.load() == false then
 	settings.set("cost", 1);
 	settings.set("author", "Schindler");
 	settings.set("debug", false);
-    settings.set("startupProgram", nil);
+	settings.set("maxBet", 1);
+    settings.set("startupProgram", "");
     settings.set("startupMonitor", "monitor_0");
 	print("Stop the host and edit .settings file with correct settings");
 	settings.save();
@@ -569,6 +575,7 @@ local function onEvent(event)
 					if keys.getName(data[1]) ~= "nil" then
 						debugLog("keyPressed key" .. keys.getName(data[1]) .. " is_held:" .. tostring(data[2]));
 						os.queueEvent("key", data[1], data[2]);
+						resetControllerTimer()
 					end;
 				else
 					print("type(data[1]) ~= number");

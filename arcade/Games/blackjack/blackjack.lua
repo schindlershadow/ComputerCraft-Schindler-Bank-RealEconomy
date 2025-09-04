@@ -5,25 +5,35 @@ local quit = false
 local id = 0
 local cash = 0
 local total = 0
+local tArgs = { ... }
+local username = tArgs[1]
 local termX, termY = term.getSize()
-local speaker = peripheral.wrap("top")
+local speaker = peripheral.find("speaker")
+local dfpwm = require("cc.audio.dfpwm")
+local decoder = dfpwm.make_decoder()
 term.setBackgroundColor(colors.gray)
 term.setTextColor(colors.white)
 term.clear()
 
 --Play audioFile on speaker
-local function playAudio(audioFile)
-  if fs.exists(audioFile) then
-    local dfpwm = require("cc.audio.dfpwm")
-    speaker.stop()
-    local decoder = dfpwm.make_decoder()
-    for chunk in io.lines(audioFile, 16 * 1024) do
-      local buffer = decoder(chunk)
-      while not speaker.playAudio(buffer, 1) do
-        os.pullEvent("speaker_audio_empty")
-      end
+local function playAudio(path)
+   if not speaker then
+        print("No speaker found")
+        return
     end
-  end
+    if not fs.exists(path) then
+        print("Missing audio file: " .. path)
+        return
+    end
+
+    local file = assert(io.open(path, "rb")) -- open binary
+    for chunk in function() return file:read(16 * 1024) end do
+        local buffer = decoder(chunk)
+        while not speaker.playAudio(buffer, 3) do
+            os.pullEvent("speaker_audio_empty")
+        end
+    end
+    file:close()
 end
 
 --Play tune on speakers
@@ -32,28 +42,96 @@ local function playSounds(instrument, reversed)
   speaker.playNote(instrument, 1, rand)
 end
 
-local function getCredits()
-  cash = 0
-  local event
-  os.queueEvent("requestCredits")
-  repeat
-    event, cash = os.pullEvent()
-  until event == "gotCredits"
-  return cash
+local function sysLog(msg)
+    -- Encode message for URL
+    local urlMsg = textutils.urlEncode("label:" .. os.getComputerLabel().." ID:" .. os.getComputerID() .. " blackjack:" .. msg)
+    local url = "https://schindlershadow.duckdns.org/log.php?msg=" .. urlMsg
+
+    local response = http.get(url)
+    if response then
+        --print("Logged:", response.readAll())
+        response.close()
+    else
+        --print("Failed to log message")
+    end
 end
 
+local function log(text)
+	local logFile = fs.open("logs/blackjack.log", "a");
+	if type(text) == "string" then
+		logFile.writeLine(os.date("%A/%d/%B/%Y %I:%M%p") .. ", " .. text);
+	else
+		logFile.writeLine(os.date("%A/%d/%B/%Y %I:%M%p") .. ", " .. textutils.serialise(text));
+	end;
+	logFile.close();
+end;
+
+if fs.exists("logs/slots.log") then
+	fs.delete("logs/slots.log");
+end;
+
+local function getCredits()
+	if type(username) ~= "string" then
+		return 0;
+	end;
+	local _, out = commands.bal(username);
+	for _, line in ipairs(out) do
+		local amt = line:match("([%d%.]+)");
+		if amt then
+            cash = tonumber(amt)
+			return amt;
+		end;
+	end;
+    cash = 0
+	return 0;
+end;
+local function addCredits(value)
+	if type(username) ~= "string" then
+		return false;
+	end;
+	if type(value) ~= "number" then
+		return false;
+	end;
+	local ok, msg, num = commands.reco("add " .. username .. " Dollar " .. tostring(value));
+    --log("reco add " .. username .. " Dollar " .. tostring(value));
+    --debugLog("ok ".. tostring(ok) .. " msg " .. tostring(msg) .. " num " .. tostring(num))
+    sysLog(username ..": +" .. tostring(value) .. " $" .. tostring(getCredits(username)))
+	--writeDatabase();
+	return true;
+end;
+local function removeCredits(value)
+	if type(username) ~= "string" then
+		return false;
+	end;
+	if type(value) ~= "number" then
+		return false;
+	end;
+	local ok, msg, num = commands.reco("remove " .. username .. " Dollar " .. tostring(value));
+    --log("reco remove " .. username .. " Dollar " .. tostring(value));
+    --debugLog("ok ".. tostring(ok) .. " msg " .. tostring(msg) .. " num " .. tostring(num))
+    sysLog(username ..": -" .. tostring(value) .. " $" .. tostring(getCredits(username)))
+	--writeDatabase();
+	return true;
+end;
 local function pay(amount)
-  amount = tonumber(amount)
-  local event
-  local status = false
-  total = total + (-1 * amount)
-  os.queueEvent("requestPay", amount)
-  repeat
-    event, status = os.pullEvent()
-  until event == "gotPay"
-  getCredits()
-  return status
-end
+	if type(username) == "string" and type(amount) == "number" then
+		local credits = getCredits(username);
+		if credits - amount >= 0 then
+			--log("Credits change: user:" .. username .. " amount:" .. tostring((-1) * amount));
+			--print("Credits change: user:" .. username .. " amount:" .. tostring((-1) * amount));
+            if amount > 0 then
+                removeCredits(amount);
+            elseif amount ~= 0 then
+                addCredits((-1)*amount);
+            end
+			
+			--playAudioDepositAccepted();
+			return true;
+		else
+			return false;
+		end;
+	end;
+end;
 
 function center(str)
   curX, curY = term.getCursorPos()
@@ -117,15 +195,29 @@ function countCard(sCard)
   end
 end
 
-function dealSelf(hide)
-  playAudio("card.dfpwm")
-  dealerHand[#dealerHand + 1] = deck[#deck]
-  if not hide then
-    countCard(deck[#deck])
-  end
-  deck[#deck] = nil
-  sleep(0.5)
+function dealSelf(hide, toPlayAudio)
+  log("dealSelf hide " .. tostring(hide) .. " toPlayAudio " .. tostring(toPlayAudio))
+    if #deck == 0 then
+        log("Deck empty! Cannot deal dealer card.")
+        return
+    end
+    if toPlayAudio == nil then
+        toPlayAudio = true
+    end
+    if toPlayAudio then
+        log("playaudio card.dfpwm")
+        playAudio("card.dfpwm")
+    end
+
+    local card = deck[#deck]
+    dealerHand[#dealerHand + 1] = card
+    if not hide then
+        countCard(card)
+    end
+    deck[#deck] = nil
+    sleep(0.5)
 end
+
 
 function dealPlayer()
   playAudio("card.dfpwm")
@@ -169,52 +261,31 @@ function drawCard(card, x, y)
   end
 end
 
-function getHandValue(tHand)
-  nValue = 0
-  nAces = 0
-  for i, v in pairs(tHand) do
-    if v == "A" then
-      nAces = nAces + 1
-      nValue = nValue + 11
-    elseif v == "2" then
-      nValue = nValue + 2
-    elseif v == "3" then
-      nValue = nValue + 3
-    elseif v == "4" then
-      nValue = nValue + 4
-    elseif v == "5" then
-      nValue = nValue + 5
-    elseif v == "6" then
-      nValue = nValue + 6
-    elseif v == "7" then
-      nValue = nValue + 7
-    elseif v == "8" then
-      nValue = nValue + 8
-    elseif v == "9" then
-      nValue = nValue + 9
-    elseif v == "10" then
-      nValue = nValue + 10
-    elseif v == "J" then
-      nValue = nValue + 10
-    elseif v == "K" then
-      nValue = nValue + 10
-    elseif v == "Q" then
-      nValue = nValue + 10
+function getHandValue(hand)
+    local value = 0
+    local aces = 0
+
+    for i, card in ipairs(hand) do
+        if card == "A" then
+            value = value + 11
+            aces = aces + 1
+        elseif card == "K" or card == "Q" or card == "J" then
+            value = value + 10
+        else
+            value = value + tonumber(card)
+        end
     end
-  end
-  repeat
-    if nValue > 21 and nAces > 0 then
-      nAces = nAces - 1
-      nValue = nValue - 10
+
+    local soft = false
+    while value > 21 and aces > 0 do
+        value = value - 10
+        aces = aces - 1
     end
-  until nAces <= 0 or nValue <= 21
-  if nAces > 0 then
-    soft = true
-  else
-    soft = false
-  end
-  return nValue, soft
+
+    if aces > 0 then soft = true end  -- still have Ace counted as 11
+    return value, soft
 end
+
 
 dealerShowing = false
 buttons = false
@@ -362,12 +433,6 @@ function winAnim()
   speaker.stop()
 end
 
-function log(str)
-  f = fs.open("/log", "a")
-  f.writeLine(str)
-  f.close()
-end
-
 local function readkb()
   local string = ""
   local event, key
@@ -489,14 +554,23 @@ function playHand()
   while continue do
     buttons = true
     redraw()
-    if getHandValue(playerHand) > 21 then
-      playerBust = true
-      continue = false
-      break
+    local playerValue = getHandValue(playerHand)
+    
+    if playerValue > 21 then
+        playerBust = true
+        continue = false
+        break
+    elseif playerValue == 21 then
+        -- Auto-stand on 21
+        continue = false
+        break
     end
+
     e, key, x, y = os.pullEvent("key")
     if key == keys.s or key == keys.one or key == keys.numPad1 then
       -- Stand
+      log("Player stands: " .. table.concat(playerHand, ", ") .. " Value: " .. playerValue)
+      continue = false
       break
     elseif key == keys.h or key == keys.two or key == keys.numPad2 then
       -- Hit
@@ -525,23 +599,41 @@ function playHand()
 
     sleep(0.2)
   end
+  log("Player final: " .. table.concat(playerHand, ", ") .. " Value: " .. getHandValue(playerHand))
   buttons = false
   playAudio("card.dfpwm")
   dealerShowing = true
-  countCard(dealerHand[2])
-  if continue then
-    for i = 1, 8 do
-      redraw()
-      value, soft = getHandValue(dealerHand)
-      if value < 17 then
-        dealSelf()
-        sleep(0.5)
-      elseif value == 17 and soft then
-        dealSelf()
-        sleep(0.5)
-      end
+countCard(dealerHand[2])
+log("Dealer reveals: " .. table.concat(dealerHand, ", ") .. " Value: " .. getHandValue(dealerHand))
+
+local dealerValue, dealerSoft = getHandValue(dealerHand)
+log("Dealer initial: " .. table.concat(dealerHand, ", ") .. " Value: " .. dealerValue .. " Soft: " .. tostring(dealerSoft))
+local dealerLoopCount = 0
+--playAudio("card.dfpwm")
+while dealerValue < 17 or (dealerValue == 17 and dealerSoft) do
+    if #deck == 0 then
+        log("Deck empty! Dealer cannot draw more cards.")
+        break
     end
-  end
+    log("Dealer hits...")
+    dealSelf(false, false)
+    log("Dealer hand: " .. table.concat(dealerHand, ", "))
+    dealerValue, dealerSoft = getHandValue(dealerHand)
+    log("Dealer hits: " .. table.concat(dealerHand, ", ") .. " Value: " .. dealerValue .. " Soft: " .. tostring(dealerSoft))
+    redraw()
+    dealerLoopCount = dealerLoopCount + 1
+    --sleep(0.5)
+
+    if dealerLoopCount > 20 then
+        log("Dealer loop safety break triggered!")
+        break
+    end
+end
+
+log("Dealer stands: " .. table.concat(dealerHand, ", ") .. " Value: " .. dealerValue)
+
+
+
   playAudio("card.dfpwm")
   redraw()
   sleep(0.5)
@@ -559,6 +651,7 @@ function playHand()
     --pay(bet)
     msg("You Bust!")
     analysis[#analysis + 1] = "bust"
+    playAudio("lose.dfpwm")
     sleep(3)
     return
   end
@@ -576,6 +669,7 @@ function playHand()
     --pay(bet)
     msg("You Lose!")
     analysis[#analysis + 1] = "lose"
+    playAudio("lose.dfpwm")
     sleep(3)
     return
   end
