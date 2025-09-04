@@ -327,7 +327,7 @@ local function pay(amount, username)
 end;
 
 local function playGame(username)
-	local status = pay();
+	local status = pay(tonumber(settings.get("cost")), username);
 	if settings.get("debug") or status then
 		monitor.setTextScale(0.5);
 		shell.run("monitor", monitorSide, settings.get("launcher") .. " " .. username);
