@@ -459,6 +459,13 @@ local function readkb()
   end
 end
 
+-- Round to n decimal places (default = 0)
+local function round(num, n)
+    n = n or 0
+    local mult = 10 ^ n
+    return math.floor(num * mult + 0.5) / mult
+end
+
 function playHand()
   if cash == 0 then
     optA = true
@@ -501,7 +508,7 @@ function playHand()
       term.setTextColor(colors.white)
       write("Bet: ")
       bet = 0
-      bet = tonumber(string.format("%.1f", tonumber(readkb())))
+      bet = tonumber(string.format("%.2f", tonumber(readkb())))
       if bet == 0 then
         quit = true
         return
@@ -512,8 +519,9 @@ function playHand()
       if bet > tonumber(settings.get("maxBet")) then
         bet = tonumber(settings.get("maxBet"))
       end
+      bet = round(bet, 0)
     until bet <= cash and bet >= 1
-    pay(bet)
+    pay(round(bet,2))
     playAudio("chips.dfpwm")
     sleep(0.5)
   end
@@ -581,7 +589,7 @@ function playHand()
       -- Double
       if cash >= (bet * 2) and not doubled then
         doubled = true
-        pay(bet)
+        pay(round(bet,2))
         dealPlayer()
         bet = bet * 2
       end
@@ -601,7 +609,7 @@ function playHand()
   end
   log("Player final: " .. table.concat(playerHand, ", ") .. " Value: " .. getHandValue(playerHand))
   buttons = false
-  playAudio("card.dfpwm")
+  --playAudio("card.dfpwm")
   dealerShowing = true
 countCard(dealerHand[2])
 log("Dealer reveals: " .. table.concat(dealerHand, ", ") .. " Value: " .. getHandValue(dealerHand))
@@ -622,7 +630,7 @@ while dealerValue < 17 or (dealerValue == 17 and dealerSoft) do
     log("Dealer hits: " .. table.concat(dealerHand, ", ") .. " Value: " .. dealerValue .. " Soft: " .. tostring(dealerSoft))
     redraw()
     dealerLoopCount = dealerLoopCount + 1
-    --sleep(0.5)
+    sleep(0.5)
 
     if dealerLoopCount > 20 then
         log("Dealer loop safety break triggered!")
@@ -639,7 +647,7 @@ log("Dealer stands: " .. table.concat(dealerHand, ", ") .. " Value: " .. dealerV
   sleep(0.5)
   if blackJack then
     --cash = cash + (bet * 1.5)
-    pay(-1 * (bet + (bet * 1.5)))
+    pay(round(-1 * (bet + (bet * 1.5)),2))
     msg("Blackjack!")
     analysis[#analysis + 1] = "blackjack"
     sleep(2)
@@ -657,7 +665,7 @@ log("Dealer stands: " .. table.concat(dealerHand, ", ") .. " Value: " .. dealerV
   end
   if getHandValue(dealerHand) > 21 then
     --cash = cash + bet
-    pay(-1 * (bet * 2))
+    pay(round(-1 * (bet * 2),2))
     msg("Dealer Busts!")
     analysis[#analysis + 1] = "dealerbust"
     sleep(2)
@@ -674,7 +682,7 @@ log("Dealer stands: " .. table.concat(dealerHand, ", ") .. " Value: " .. dealerV
     return
   end
   if getHandValue(dealerHand) == getHandValue(playerHand) then
-    pay(-1 * bet)
+    pay(round(-1 * bet,2))
     msg("You Push!")
     analysis[#analysis + 1] = "push"
     sleep(3)
@@ -682,7 +690,7 @@ log("Dealer stands: " .. table.concat(dealerHand, ", ") .. " Value: " .. dealerV
   end
   if getHandValue(playerHand) > getHandValue(dealerHand) then
     --cash = cash + bet
-    pay(-1 * (bet * 2))
+    pay(round(-1 * (bet * 2),2))
     msg("You Win!")
     analysis[#analysis + 1] = "win"
     sleep(2)
