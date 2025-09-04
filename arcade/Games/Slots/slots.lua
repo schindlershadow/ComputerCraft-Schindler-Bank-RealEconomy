@@ -304,6 +304,9 @@ local function removeCredits(value)
 	return true;
 end;
 local function pay(amount)
+    if settings.get("debug") then
+		return true;
+	end
 	if type(username) == "string" and type(amount) == "number" then
 		local credits = getCredits(username);
 		if credits - amount >= 0 then

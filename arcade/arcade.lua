@@ -77,13 +77,12 @@ if settings.load() == false then
 	settings.set("author", "Schindler");
 	settings.set("debug", false);
 	settings.set("maxBet", 1);
-    settings.set("startupProgram", "");
-    settings.set("startupMonitor", "monitor_0");
+	settings.set("startupProgram", "");
+	settings.set("startupMonitor", "monitor_0");
 	print("Stop the host and edit .settings file with correct settings");
 	settings.save();
 	pcall(sleep, 2);
 end;
-
 if not fs.exists("cryptoNet") then
 	print("");
 	print("cryptoNet API not found on disk, downloading...");
@@ -176,6 +175,22 @@ local function playAudio(audioFile)
 		end;
 	end;
 end;
+local function calcScale(multiple)
+	if multiple == nil then
+		multiple = 1;
+	end;
+	monitor.setTextScale(1);
+	local w, h = monitor.getSize();
+	local blockW = w / 6;
+	local blockH = h / 9;
+	if blockW >= 5 and blockH >= 2 then
+		monitor.setTextScale(1*multiple);
+		print("Using text scale " .. tostring(1*multiple));
+    else
+        monitor.setTextScale(0.5*multiple);
+		print("Using text scale " .. tostring(0.5*multiple));
+	end;
+end;
 local function playAudioExit()
 	playAudio("exit.dfpwm");
 end;
@@ -223,25 +238,20 @@ local function debugLog(text)
 	end;
 end;
 local function sysLog(msg)
-    -- Encode message for URL
-    local urlMsg = textutils.urlEncode("label:" .. os.getComputerLabel().." ID:" .. os.getComputerID() .. " arcade:" .. msg)
-    local url = "https://schindlershadow.duckdns.org/log.php?msg=" .. urlMsg
-
-    local response = http.get(url)
-    if response then
-        --print("Logged:", response.readAll())
-        response.close()
-    else
-        --print("Failed to log message")
-		log("Failed to log message: " .. msg)
-    end
-end
--- Toast helper
+	local urlMsg = textutils.urlEncode("label:" .. os.getComputerLabel() .. " ID:" .. os.getComputerID() .. " arcade:" .. msg);
+	local url = "https://schindlershadow.duckdns.org/log.php?msg=" .. urlMsg;
+	local response = http.get(url);
+	if response then
+		response.close();
+	else
+		log("Failed to log message: " .. msg);
+	end;
+end;
 local function sendToast(username, title, msg)
-    if chatbox and chatbox.sendToastToPlayer then
-        chatbox.sendToastToPlayer(msg, title, username, "&4&lBank", "()", "&c&l")
-    end
-end
+	if chatbox and chatbox.sendToastToPlayer then
+		chatbox.sendToastToPlayer(msg, title, username, "&4&lBank", "()", "&c&l");
+	end;
+end;
 local function centerText(text)
 	if monitor ~= nil then
 		if text == nil then
@@ -263,7 +273,7 @@ local function drawTransition(color)
 	end;
 end;
 local function drawExit()
-	monitor.setTextScale(1);
+	calcScale()
 	drawTransition(colors.blue);
 	monitor.setCursorPos(1, 1);
 	monitor.setBackgroundColor(colors.black);
@@ -305,7 +315,7 @@ local function getCredits(username)
 	for _, line in ipairs(out) do
 		local amt = line:match("([%d%.]+)");
 		if amt then
-            credits = tonumber(amt)
+			credits = tonumber(amt);
 			return tonumber(amt);
 		end;
 	end;
@@ -320,14 +330,13 @@ local function addCredits(username, value)
 	end;
 	loadingScreen("Processing payment");
 	commands.reco("add " .. username .. " Dollar " .. tostring(value));
-	sysLog(username ..": +" .. tostring(value) .. " $" .. tostring(getCredits(username)))
+	sysLog(username .. ": +" .. tostring(value) .. " $" .. tostring(getCredits(username)));
 	debugLog("reco add " .. username .. " Dollar " .. tostring(value));
 	sendToast(username, "Payment Processed - Arcade: " .. tostring(os.getComputerLabel()), "+$" .. tostring(value) .. " for " .. settings.get("gameName"));
-	--writeDatabase();
 	return true;
 end;
 local function removeCredits(username, value)
-	debugLog("removeCredits: username:" .. tostring(username) .. " value:" .. tostring(value))
+	debugLog("removeCredits: username:" .. tostring(username) .. " value:" .. tostring(value));
 	if type(username) ~= "string" then
 		return false;
 	end;
@@ -336,45 +345,41 @@ local function removeCredits(username, value)
 	end;
 	loadingScreen("Processing payment...");
 	local ok, msg, num = commands.reco("remove " .. username .. " Dollar " .. tostring(value));
-	sysLog(username ..": -" .. tostring(value) .. " $" .. tostring(getCredits(username)))
-    debugLog("reco remove " .. username .. " Dollar " .. tostring(value));
-	--writeDatabase();
-	--log("Payment Processed - Arcade: " .. tostring(os.getComputerLabel() .. " -$" .. tostring(value) .. " for " .. settings.get("gameName")))
+	sysLog(username .. ": -" .. tostring(value) .. " $" .. tostring(getCredits(username)));
+	debugLog("reco remove " .. username .. " Dollar " .. tostring(value));
 	sendToast(username, "Payment Processed - Arcade: " .. tostring(os.getComputerLabel()), "-$" .. tostring(value) .. " for " .. settings.get("gameName"));
-    playAudioDepositAccepted();
+	playAudioDepositAccepted();
 	return true;
 end;
 local function pay(amount, username)
 	if type(username) == "string" and type(amount) == "number" then
 		if getCredits(username) - amount >= 0 then
 			log("Credits change: user:" .. username .. " amount:" .. tostring((-1) * amount));
-			--print("Credits change: user:" .. username .. " amount:" .. tostring((-1) * amount));
-            local status = false
+			local status = false;
 			debugLog("check pay: cost" .. tostring(amount) .. " username:" .. username);
-            if amount > 0 then
-                status = removeCredits(username, amount);
+			if amount > 0 then
+				status = removeCredits(username, amount);
 			elseif amount < 0 then
-                status = addCredits(username, (-1)*amount);
+				status = addCredits(username, (-1) * amount);
 			elseif amount == 0 then
-				return true
-            end
+				return true;
+			end;
 			return status;
 		else
 			return false;
 		end;
 	end;
-    return false;
+	return false;
 end;
-
 local function playGame(username)
 	local status = pay(tonumber(settings.get("cost")), username);
-    log("pay: cost:" .. tostring(settings.get("cost")) .. " username:" .. username .. " status:" .. tostring(status))
+	log("pay: cost:" .. tostring(settings.get("cost")) .. " username:" .. username .. " status:" .. tostring(status));
 	if settings.get("debug") or status then
-		monitor.setTextScale(0.5);
+		calcScale()
 		drawTransition(colors.black);
 		shell.run("monitor", monitorSide, settings.get("launcher") .. " " .. username);
 		monitor.setTextColor(colors.white);
-		monitor.setTextScale(1);
+		calcScale(2)
 		getCredits(username);
 	else
 		loadingScreen("Failed to make payment");
@@ -483,7 +488,7 @@ local function drawMainMenu()
 		monitor.setTextColor(colors.white);
 		if monitor ~= nil then
 			code = math.random(1000, 9999);
-			monitor.setTextScale(1);
+			calcScale(2)
 			drawTransition(colors.blue);
 			monitor.setCursorPos(1, 1);
 			monitor.setBackgroundColor(colors.black);
@@ -593,7 +598,7 @@ local function onEvent(event)
 					if keys.getName(data[1]) ~= "nil" then
 						debugLog("keyPressed key" .. keys.getName(data[1]) .. " is_held:" .. tostring(data[2]));
 						os.queueEvent("key", data[1], data[2]);
-						resetControllerTimer()
+						resetControllerTimer();
 					end;
 				else
 					print("type(data[1]) ~= number");
@@ -747,10 +752,10 @@ local function startupProgram()
 	print("Starting second monitor program: " .. tostring(settings.get("startupProgram")));
 	shell.run(settings.get("startupProgram"));
 end;
+calcScale(2)
 loadingScreen("Arcade is loading");
 print("Client is loading, please wait....");
 if not settings.get("debug") then
-	--staggered launch
 	sleep(1 + math.random(10));
 	checkUpdates();
 end;
