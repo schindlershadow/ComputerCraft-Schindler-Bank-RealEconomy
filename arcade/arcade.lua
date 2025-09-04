@@ -310,6 +310,7 @@ local function addCredits(username, value)
 	if type(value) ~= "number" then
 		return false;
 	end;
+	loadingScreen("Processing payment");
 	commands.reco("add " .. username .. " Dollar " .. tostring(value));
 	sysLog(username ..": +" .. tostring(value) .. " $" .. tostring(getCredits(username)))
 	--writeDatabase();
@@ -322,6 +323,7 @@ local function removeCredits(username, value)
 	if type(value) ~= "number" then
 		return false;
 	end;
+	loadingScreen("Processing payment...");
 	local ok, msg, num = commands.reco("remove " .. username .. " Dollar " .. tostring(value));
 	sysLog(username ..": -" .. tostring(value) .. " $" .. tostring(getCredits(username)))
 	--writeDatabase();
@@ -354,6 +356,7 @@ local function playGame(username)
     log("pay: cost:" .. tostring(settings.get("cost")) .. " username:" .. username .. " status:" .. tostring(status))
 	if settings.get("debug") or status then
 		monitor.setTextScale(0.5);
+		drawTransition(colors.black);
 		shell.run("monitor", monitorSide, settings.get("launcher") .. " " .. username);
 		monitor.setTextColor(colors.white);
 		monitor.setTextScale(1);
@@ -731,8 +734,9 @@ end;
 loadingScreen("Arcade is loading");
 print("Client is loading, please wait....");
 if not settings.get("debug") then
+	--staggered launch
+	sleep(1 + math.random(10));
 	checkUpdates();
-	sleep(1 + math.random(30));
 end;
 if settings.get("startupProgram") ~= nil then
 	os.startThread(startupProgram);

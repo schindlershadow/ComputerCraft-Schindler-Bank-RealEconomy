@@ -13,7 +13,7 @@ local dfpwm = require("cc.audio.dfpwm")
 local decoder = dfpwm.make_decoder()
 term.setBackgroundColor(colors.gray)
 term.setTextColor(colors.white)
-term.clear()
+--term.clear()
 
 --Play audioFile on speaker
 local function playAudio(path)
@@ -69,7 +69,39 @@ end;
 if fs.exists("logs/slots.log") then
 	fs.delete("logs/slots.log");
 end;
-
+local function centerText(text)
+	if term ~= nil then
+		if text == nil then
+			text = "";
+		end;
+		local x, y = term.getSize();
+		local x1, y1 = term.getCursorPos();
+		term.setCursorPos(math.floor(x / 2) - math.floor((#text) / 2), y1);
+		term.write(text);
+	end;
+end;
+local function drawTransition(color)
+	local x, y = term.getSize();
+	term.setBackgroundColor(color);
+	for i = 1, y do
+		term.setCursorPos(1, i);
+		term.clearLine();
+		sleep(0);
+	end;
+end;
+local function loadingScreen(text)
+	if type(text) == nil then
+		text = "";
+	end;
+  local x, y = term.getSize();
+	term.getBackgroundColor(colors.green);
+  --term.clear()
+	term.setCursorPos(1, y);
+	centerText(text);
+	term.setCursorPos(1, 4);
+	--centerText("Loading...");
+	term.setCursorPos(1, 6);
+end;
 local function getCredits()
 	if type(username) ~= "string" then
 		return 0;
@@ -92,6 +124,7 @@ local function addCredits(value)
 	if type(value) ~= "number" then
 		return false;
 	end;
+  loadingScreen("Processing payment...");
 	local ok, msg, num = commands.reco("add " .. username .. " Dollar " .. tostring(value));
     --log("reco add " .. username .. " Dollar " .. tostring(value));
     --debugLog("ok ".. tostring(ok) .. " msg " .. tostring(msg) .. " num " .. tostring(num))
@@ -106,6 +139,7 @@ local function removeCredits(value)
 	if type(value) ~= "number" then
 		return false;
 	end;
+  loadingScreen("Processing payment...");
 	local ok, msg, num = commands.reco("remove " .. username .. " Dollar " .. tostring(value));
     --log("reco remove " .. username .. " Dollar " .. tostring(value));
     --debugLog("ok ".. tostring(ok) .. " msg " .. tostring(msg) .. " num " .. tostring(num))
@@ -124,7 +158,7 @@ local function pay(amount)
             elseif amount ~= 0 then
                 addCredits((-1)*amount);
             end
-			
+			total = total + ((-1) * amount);
 			--playAudioDepositAccepted();
 			return true;
 		else
@@ -459,6 +493,107 @@ local function readkb()
   end
 end
 
+local function drawAnalysis()
+  --term.setBackgroundColor(colors.gray)
+  drawTransition(colors.gray)
+  --term.clear()
+  term.setTextColor(colors.white)
+  cBlackjack = 0
+  cDealerbust = 0
+  cBust = 0
+  cLose = 0
+  cPush = 0
+  cWin = 0
+  for i, v in pairs(analysis) do
+    if v == "blackjack" then
+      cBlackjack = cBlackjack + 1
+    elseif v == "dealerbust" then
+      cDealerbust = cDealerbust + 1
+    elseif v == "bust" then
+      cBust = cBust + 1
+    elseif v == "lose" then
+      cLose = cLose + 1
+    elseif v == "push" then
+      cPush = cPush + 1
+    elseif v == "win" then
+      cWin = cWin + 1
+    end
+  end
+  gameCount = cBlackjack + cDealerbust + cBust + cLose + cPush + cWin
+  startPoint = 2
+  colorz = {
+    [6] = colors.purple,
+    [4] = colors.lime,
+    [1] = colors.red,
+    [2] = colors.orange,
+    [5] = colors.green,
+    [3] = colors.yellow,
+  }
+  output = {
+    [1] = cBust,
+    [2] = cLose,
+    [3] = cPush,
+    [4] = cWin,
+    [5] = cDealerbust,
+    [6] = cBlackjack,
+  }
+  if gameCount > 0 then
+  for i, v in pairs(output) do
+    paintutils.drawLine(startPoint, 4, (startPoint + ((v / gameCount) * 49) - 1), 4, colorz[i])
+    startPoint = startPoint + ((v / gameCount) * 49)
+  end
+end
+
+  paintutils.drawPixel(1, 4, colors.gray)
+  paintutils.drawPixel(51, 4, colors.gray)
+  analysis = {}
+  term.setBackgroundColor(colors.gray)
+  term.setTextColor(colors.white)
+  term.setCursorPos(1, 2)
+  center("Game Analysis")
+  term.setCursorPos(4, 6)
+  term.setBackgroundColor(colors.gray)
+  term.setTextColor(colors.red)
+  write("Bust  ")
+  term.setTextColor(colors.orange)
+  write("Lose  ")
+  term.setTextColor(colors.yellow)
+  write("Push  ")
+  term.setTextColor(colors.lime)
+  write("Win  ")
+  term.setTextColor(colors.green)
+  write("Dealer Bust  ")
+  term.setTextColor(colors.purple)
+  write("Blackjack")
+
+
+  term.setCursorPos(1, 8)
+  term.setTextColor(colors.red)
+  print("Bust: " .. tostring(cBust))
+  term.setTextColor(colors.orange)
+  print("Lose: " .. tostring(cLose))
+  term.setTextColor(colors.yellow)
+  print("Push: " .. tostring(cPush))
+  term.setTextColor(colors.lime)
+  print("Win: " .. tostring(cWin))
+  term.setTextColor(colors.green)
+  print("Dealer Bust: " .. tostring(cDealerbust))
+  term.setTextColor(colors.purple)
+  print("Blackjack: " .. tostring(cBlackjack))
+  term.setTextColor(colors.white)
+  print("")
+  print("Total Winnings: \167" .. tostring(total))
+  term.setCursorPos(1, 18)
+  term.setBackgroundColor(colors.lightGray)
+  term.setTextColor(colors.gray)
+  centerText(" Press any key to exit ")
+  --sleep(5)
+  repeat
+    e = os.pullEvent()
+  until e == "key"
+  quit = true
+end
+
 -- Round to n decimal places (default = 0)
 local function round(num, n)
     n = n or 0
@@ -480,7 +615,7 @@ function playHand()
     center("You're ruined!")
     term.setCursorPos(1, 13)
     term.setTextColor(colors.red)
-    center("\1670 Credits")
+    center("\1670 Dollars")
     sleep(5)
     quit = true
     return
@@ -510,6 +645,7 @@ function playHand()
       bet = 0
       bet = tonumber(string.format("%.2f", tonumber(readkb())))
       if bet == 0 then
+        drawAnalysis()
         quit = true
         return
       end
@@ -699,104 +835,9 @@ log("Dealer stands: " .. table.concat(dealerHand, ", ") .. " Value: " .. dealerV
   end
 end
 
-local function drawAnalysis()
-  term.setBackgroundColor(colors.gray)
-  term.clear()
-  term.setTextColor(colors.white)
-  cBlackjack = 0
-  cDealerbust = 0
-  cBust = 0
-  cLose = 0
-  cPush = 0
-  cWin = 0
-  for i, v in pairs(analysis) do
-    if v == "blackjack" then
-      cBlackjack = cBlackjack + 1
-    elseif v == "dealerbust" then
-      cDealerbust = cDealerbust + 1
-    elseif v == "bust" then
-      cBust = cBust + 1
-    elseif v == "lose" then
-      cLose = cLose + 1
-    elseif v == "push" then
-      cPush = cPush + 1
-    elseif v == "win" then
-      cWin = cWin + 1
-    end
-  end
-  gameCount = cBlackjack + cDealerbust + cBust + cLose + cPush + cWin
-  startPoint = 2
-  colorz = {
-    [6] = colors.purple,
-    [4] = colors.lime,
-    [1] = colors.red,
-    [2] = colors.orange,
-    [5] = colors.green,
-    [3] = colors.yellow,
-  }
-  output = {
-    [1] = cBust,
-    [2] = cLose,
-    [3] = cPush,
-    [4] = cWin,
-    [5] = cDealerbust,
-    [6] = cBlackjack,
-  }
-  for i, v in pairs(output) do
-    paintutils.drawLine(startPoint, 4, (startPoint + ((v / gameCount) * 49) - 1), 4, colorz[i])
-    startPoint = startPoint + ((v / gameCount) * 49)
-  end
-  paintutils.drawPixel(1, 4, colors.gray)
-  paintutils.drawPixel(51, 4, colors.gray)
-  analysis = {}
-  term.setBackgroundColor(colors.gray)
-  term.setTextColor(colors.white)
-  term.setCursorPos(1, 2)
-  center("Game Analysis")
-  term.setCursorPos(4, 6)
-  term.setBackgroundColor(colors.gray)
-  term.setTextColor(colors.red)
-  write("Bust  ")
-  term.setTextColor(colors.orange)
-  write("Lose  ")
-  term.setTextColor(colors.yellow)
-  write("Push  ")
-  term.setTextColor(colors.lime)
-  write("Win  ")
-  term.setTextColor(colors.green)
-  write("Dealer Bust  ")
-  term.setTextColor(colors.purple)
-  write("Blackjack")
-
-
-  term.setCursorPos(1, 8)
-  term.setTextColor(colors.red)
-  print("Bust: " .. tostring(cBust))
-  term.setTextColor(colors.orange)
-  print("Lose: " .. tostring(cLose))
-  term.setTextColor(colors.yellow)
-  print("Push: " .. tostring(cPush))
-  term.setTextColor(colors.lime)
-  print("Win: " .. tostring(cWin))
-  term.setTextColor(colors.green)
-  print("Dealer Bust: " .. tostring(cDealerbust))
-  term.setTextColor(colors.purple)
-  print("Blackjack: " .. tostring(cBlackjack))
-  term.setTextColor(colors.white)
-  print("")
-  print("Total Winnings: \167" .. tostring(total))
-  term.setCursorPos(42, 18)
-  term.setBackgroundColor(colors.lightGray)
-  term.setTextColor(colors.gray)
-  write(" Close ")
-  repeat
-    e = os.pullEvent()
-  until e == "key"
-  quit = true
-end
-
 local function onStart()
   -- Start Game
+  drawTransition(colors.gray)
   paintutils.drawFilledBox(1, 7, termX, 11, colors.lightGray)
   term.setCursorPos(1, 8)
   term.setTextColor(colors.black)

@@ -85,6 +85,40 @@ if fs.exists("logs/slots.log") then
 	fs.delete("logs/slots.log");
 end;
 
+local function centerText(text)
+	if term ~= nil then
+		if text == nil then
+			text = "";
+		end;
+		local x, y = term.getSize();
+		local x1, y1 = term.getCursorPos();
+		term.setCursorPos(math.floor(x / 2) - math.floor((#text) / 2), y1);
+		term.write(text);
+	end;
+end;
+local function drawTransition(color)
+	local x, y = term.getSize();
+	term.setBackgroundColor(color);
+	for i = 1, y do
+		term.setCursorPos(1, i);
+		term.clearLine();
+		sleep(0);
+	end;
+end;
+local function loadingScreen(text)
+	if type(text) == nil then
+		text = "";
+	end;
+  local x, y = term.getSize();
+	term.setBackgroundColor(colors.red);
+  --term.clear()
+	term.setCursorPos(1, y);
+	centerText(text);
+	term.setCursorPos(1, 4);
+	--centerText("Loading...");
+	term.setCursorPos(1, 6);
+end;
+
 local function drawBox(startX, startY, endX, endY, color)
     paintutils.drawFilledBox(startX + offset, startY + offset, endX + offset, endY + offset, color)
 end
@@ -279,6 +313,7 @@ local function addCredits(value)
 	if type(value) ~= "number" then
 		return false;
 	end;
+    loadingScreen("Processing payment...");
 	local ok, msg, num = commands.reco("add " .. username .. " Dollar " .. tostring(value));
     log("reco add " .. username .. " Dollar " .. tostring(value));
     debugLog("ok ".. tostring(ok) .. " msg " .. tostring(msg) .. " num " .. tostring(num))
@@ -293,6 +328,7 @@ local function removeCredits(value)
 	if type(value) ~= "number" then
 		return false;
 	end;
+    loadingScreen("Processing payment...");
 	local ok, msg, num = commands.reco("remove " .. username .. " Dollar " .. tostring(value));
     log("reco remove " .. username .. " Dollar " .. tostring(value));
     debugLog("ok ".. tostring(ok) .. " msg " .. tostring(msg) .. " num " .. tostring(num))
