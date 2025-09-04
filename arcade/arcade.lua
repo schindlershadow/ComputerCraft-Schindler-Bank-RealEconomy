@@ -333,7 +333,7 @@ local function playGame(username)
 		shell.run("monitor", monitorSide, settings.get("launcher") .. " " .. username);
 		monitor.setTextColor(colors.white);
 		monitor.setTextScale(1);
-		getCredits();
+		getCredits(username);
 	else
 		loadingScreen("Failed to make payment");
 		pcall(sleep, 2);
@@ -360,7 +360,7 @@ end;
 local function userMenu(username)
 	local done = false;
 	while done == false do
-		getCredits();
+		getCredits(username);
 		drawTransition(colors.blue);
 		monitor.setCursorPos(1, 1);
 		monitor.setBackgroundColor(colors.black);
