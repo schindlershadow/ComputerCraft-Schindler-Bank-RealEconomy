@@ -418,7 +418,7 @@ local function drawMonitor()
 end
 
 local function onStart()
-    os.setComputerLabel(settings.get("clientName") .. "ID: " .. os.getComputerID())
+    os.setComputerLabel("Dispenser ID:" .. os.getComputerID())
     --clear out old log
     if fs.exists("logs/server.log") then
         fs.delete("logs/server.log")
