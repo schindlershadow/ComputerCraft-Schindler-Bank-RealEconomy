@@ -352,6 +352,9 @@ local function removeCredits(username, value)
 	return true;
 end;
 local function pay(amount, username)
+	if settings.get("debug") then
+		return true;
+	end;
 	if type(username) == "string" and type(amount) == "number" then
 		if getCredits(username) - amount >= 0 then
 			log("Credits change: user:" .. username .. " amount:" .. tostring((-1) * amount));
