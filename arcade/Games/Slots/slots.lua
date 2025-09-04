@@ -1,4 +1,5 @@
 local speaker = peripheral.find("speaker");
+local chatbox = peripheral.find("chat_box");
 local dfpwm = require("cc.audio.dfpwm");
 local decoder = dfpwm.make_decoder();
 local limit = tonumber(settings.get("maxBet"));
@@ -140,6 +141,12 @@ end;
 if fs.exists("logs/slotsDebug.log") then
 	fs.delete("logs/slotsDebug.log");
 end;
+-- Toast helper
+local function sendToast(username, title, msg)
+    if chatbox and chatbox.sendToastToPlayer then
+        chatbox.sendToastToPlayer(msg, title, username, "&4&lBank", "()", "&c&l")
+    end
+end
 debugLog("bW: " .. tostring(bW));
 debugLog("cW: " .. tostring(cW));
 debugLog("dW: " .. tostring(dW));
@@ -278,6 +285,7 @@ local function addCredits(value)
 	log("reco add " .. username .. " Dollar " .. tostring(value));
 	debugLog("ok " .. tostring(ok) .. " msg " .. tostring(msg) .. " num " .. tostring(num));
 	sysLog(username .. ": +" .. tostring(value) .. " $" .. tostring(getCredits(username)));
+    sendToast(username, "Payment Processed - Arcade: " .. tostring(os.getComputerLabel()), "+$" .. tostring(value) .. " for " .. settings.get("gameName"));
 	return true;
 end;
 local function removeCredits(value)
@@ -292,6 +300,7 @@ local function removeCredits(value)
 	log("reco remove " .. username .. " Dollar " .. tostring(value));
 	debugLog("ok " .. tostring(ok) .. " msg " .. tostring(msg) .. " num " .. tostring(num));
 	sysLog(username .. ": -" .. tostring(value) .. " $" .. tostring(getCredits(username)));
+    sendToast(username, "Payment Processed - Arcade: " .. tostring(os.getComputerLabel()), "-$" .. tostring(value) .. " for " .. settings.get("gameName"));
 	return true;
 end;
 local function pay(amount)

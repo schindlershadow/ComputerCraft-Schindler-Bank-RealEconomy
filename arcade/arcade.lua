@@ -14,8 +14,8 @@ local speakerSide = "top";
 local controllerSocket;
 local monitor = peripheral.wrap(monitorSide);
 local modem = peripheral.wrap(wirelessModemSide);
-local chatbox = peripheral.wrap(chatboxSide);
-local speaker = peripheral.wrap(speakerSide);
+local chatbox = peripheral.find("chat_box");
+local speaker = peripheral.find("speaker");
 monitor.setTextScale(1);
 settings.define("clientName", {
 	description = "The hostname of this client",
@@ -236,6 +236,12 @@ local function sysLog(msg)
 		log("Failed to log message: " .. msg)
     end
 end
+-- Toast helper
+local function sendToast(username, title, msg)
+    if chatbox and chatbox.sendToastToPlayer then
+        chatbox.sendToastToPlayer(msg, title, username, "&4&lBank", "()", "&c&l")
+    end
+end
 local function centerText(text)
 	if monitor ~= nil then
 		if text == nil then
@@ -316,6 +322,7 @@ local function addCredits(username, value)
 	commands.reco("add " .. username .. " Dollar " .. tostring(value));
 	sysLog(username ..": +" .. tostring(value) .. " $" .. tostring(getCredits(username)))
 	debugLog("reco add " .. username .. " Dollar " .. tostring(value));
+	sendToast(username, "Payment Processed - Arcade: " .. tostring(os.getComputerLabel()), "+$" .. tostring(value) .. " for " .. settings.get("gameName"));
 	--writeDatabase();
 	return true;
 end;
@@ -332,6 +339,8 @@ local function removeCredits(username, value)
 	sysLog(username ..": -" .. tostring(value) .. " $" .. tostring(getCredits(username)))
     debugLog("reco remove " .. username .. " Dollar " .. tostring(value));
 	--writeDatabase();
+	--log("Payment Processed - Arcade: " .. tostring(os.getComputerLabel() .. " -$" .. tostring(value) .. " for " .. settings.get("gameName")))
+	sendToast(username, "Payment Processed - Arcade: " .. tostring(os.getComputerLabel()), "-$" .. tostring(value) .. " for " .. settings.get("gameName"));
     playAudioDepositAccepted();
 	return true;
 end;
