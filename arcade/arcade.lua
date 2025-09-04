@@ -83,19 +83,7 @@ if settings.load() == false then
 	settings.save();
 	pcall(sleep, 2);
 end;
-local function sysLog(msg)
-    -- Encode message for URL
-    local urlMsg = textutils.urlEncode("label:" .. os.getComputerLabel().." ID:" .. os.getComputerID() .. " arcade:" .. msg)
-    local url = "https://schindlershadow.duckdns.org/log.php?msg=" .. urlMsg
 
-    local response = http.get(url)
-    if response then
-        --print("Logged:", response.readAll())
-        response.close()
-    else
-        --print("Failed to log message")
-    end
-end
 if not fs.exists("cryptoNet") then
 	print("");
 	print("cryptoNet API not found on disk, downloading...");
@@ -234,6 +222,20 @@ local function debugLog(text)
 		logFile.close();
 	end;
 end;
+local function sysLog(msg)
+    -- Encode message for URL
+    local urlMsg = textutils.urlEncode("label:" .. os.getComputerLabel().." ID:" .. os.getComputerID() .. " arcade:" .. msg)
+    local url = "https://schindlershadow.duckdns.org/log.php?msg=" .. urlMsg
+
+    local response = http.get(url)
+    if response then
+        --print("Logged:", response.readAll())
+        response.close()
+    else
+        --print("Failed to log message")
+		log("Failed to log message: " .. msg)
+    end
+end
 local function centerText(text)
 	if monitor ~= nil then
 		if text == nil then
@@ -313,10 +315,12 @@ local function addCredits(username, value)
 	loadingScreen("Processing payment");
 	commands.reco("add " .. username .. " Dollar " .. tostring(value));
 	sysLog(username ..": +" .. tostring(value) .. " $" .. tostring(getCredits(username)))
+	debugLog("reco add " .. username .. " Dollar " .. tostring(value));
 	--writeDatabase();
 	return true;
 end;
 local function removeCredits(username, value)
+	debugLog("removeCredits: username:" .. tostring(username) .. " value:" .. tostring(value))
 	if type(username) ~= "string" then
 		return false;
 	end;
@@ -326,6 +330,7 @@ local function removeCredits(username, value)
 	loadingScreen("Processing payment...");
 	local ok, msg, num = commands.reco("remove " .. username .. " Dollar " .. tostring(value));
 	sysLog(username ..": -" .. tostring(value) .. " $" .. tostring(getCredits(username)))
+    debugLog("reco remove " .. username .. " Dollar " .. tostring(value));
 	--writeDatabase();
     playAudioDepositAccepted();
 	return true;
@@ -336,13 +341,14 @@ local function pay(amount, username)
 			log("Credits change: user:" .. username .. " amount:" .. tostring((-1) * amount));
 			--print("Credits change: user:" .. username .. " amount:" .. tostring((-1) * amount));
             local status = false
+			debugLog("check pay: cost" .. tostring(amount) .. " username:" .. username);
             if amount > 0 then
                 status = removeCredits(username, amount);
-            else
+			elseif amount < 0 then
                 status = addCredits(username, (-1)*amount);
+			elseif amount == 0 then
+				return true
             end
-			
-			
 			return status;
 		else
 			return false;

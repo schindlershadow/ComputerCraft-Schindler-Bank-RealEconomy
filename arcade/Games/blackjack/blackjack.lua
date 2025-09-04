@@ -153,6 +153,9 @@ local function pay(amount)
 		if credits - amount >= 0 then
 			--log("Credits change: user:" .. username .. " amount:" .. tostring((-1) * amount));
 			--print("Credits change: user:" .. username .. " amount:" .. tostring((-1) * amount));
+      if amount == 0 then
+				return true
+            end
             if amount > 0 then
                 removeCredits(amount);
             elseif amount ~= 0 then
