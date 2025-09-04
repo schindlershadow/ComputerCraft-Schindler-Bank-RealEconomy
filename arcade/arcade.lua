@@ -278,7 +278,8 @@ local function getCredits(username)
 	for _, line in ipairs(out) do
 		local amt = line:match("([%d%.]+)");
 		if amt then
-			return amt;
+            credits = tonumber(amt)
+			return tonumber(amt);
 		end;
 	end;
 	return 0;
