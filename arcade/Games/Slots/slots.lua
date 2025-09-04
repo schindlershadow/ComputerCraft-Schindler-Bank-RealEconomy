@@ -3,11 +3,12 @@
 --------------------------------------------------
 
 local speaker = peripheral.wrap("top")
-local limit = settings.get("maxBet") --minimum creds to play
+local limit = tonumber(settings.get("maxBet")) --minimum creds to play
 local quit = false
 local jackpot = 0
-
-
+local tArgs = { ... }
+local username = tArgs[1] 
+local credits = 0
 ---------------------	percentage to win the following
 local diamondW = 2 -- % chance to land diamond
 local dollarW = 13 -- % chance to land dollar
@@ -53,6 +54,20 @@ local none = paintutils.loadImage("images/none.nfp")       -- the rest
 -----------------------
 local offset = 2
 local termX, termY = term.getSize()
+
+local function log(text)
+	local logFile = fs.open("logs/slots.log", "a");
+	if type(text) == "string" then
+		logFile.writeLine(os.date("%A/%d/%B/%Y %I:%M%p") .. ", " .. text);
+	else
+		logFile.writeLine(os.date("%A/%d/%B/%Y %I:%M%p") .. ", " .. textutils.serialise(text));
+	end;
+	logFile.close();
+end;
+
+if fs.exists("logs/slots.log") then
+	fs.delete("logs/slots.log");
+end;
 
 local function drawBox(startX, startY, endX, endY, color)
     paintutils.drawFilledBox(startX + offset, startY + offset, endX + offset, endY + offset, color)
@@ -221,21 +236,65 @@ local function drawNoCredits()
 end
 
 local function getCredits()
-    local event
-    os.queueEvent("requestCredits")
-    repeat
-        event, credits = os.pullEvent()
-    until event == "gotCredits"
-end
-
-local function pay(number)
-    local event, status
-    os.queueEvent("requestPay", number)
-    repeat
-        event, status = os.pullEvent()
-    until event == "gotPay"
-    return status
-end
+	if type(username) ~= "string" then
+		return 0;
+	end;
+	local _, out = commands.bal(username);
+	for _, line in ipairs(out) do
+		local amt = line:match("([%d%.]+)");
+		if amt then
+            credits = tonumber(amt)
+			return amt;
+		end;
+	end;
+    credits = 0
+	return 0;
+end;
+local function addCredits(value)
+	if type(username) ~= "string" then
+		return false;
+	end;
+	if type(value) ~= "number" then
+		return false;
+	end;
+	local ok, msg, num = commands.reco("add " .. username .. " Dollar " .. tostring(value));
+    log("reco add " .. username .. " Dollar " .. tostring(value));
+    debugLog("ok ".. tostring(ok) .. " msg " .. tostring(msg) .. " num " .. tostring(num))
+	--writeDatabase();
+	return true;
+end;
+local function removeCredits(value)
+	if type(username) ~= "string" then
+		return false;
+	end;
+	if type(value) ~= "number" then
+		return false;
+	end;
+	local ok, msg, num = commands.reco("remove " .. username .. " Dollar " .. tostring(value));
+    log("reco remove " .. username .. " Dollar " .. tostring(value));
+    debugLog("ok ".. tostring(ok) .. " msg " .. tostring(msg) .. " num " .. tostring(num))
+	--writeDatabase();
+	return true;
+end;
+local function pay(amount)
+	if type(username) == "string" and type(amount) == "number" then
+		local credits = getCredits(username);
+		if credits - amount >= 0 then
+			log("Credits change: user:" .. username .. " amount:" .. tostring((-1) * amount));
+			--print("Credits change: user:" .. username .. " amount:" .. tostring((-1) * amount));
+            if amount > 0 then
+                removeCredits(amount);
+            else
+                addCredits((-1)*amount);
+            end
+			
+			--playAudioDepositAccepted();
+			return true;
+		else
+			return false;
+		end;
+	end;
+end;
 
 --drawBox(1, 1, termX, termY, colors.green)
 
@@ -298,7 +357,7 @@ function insert_amount()
         term.setTextColor(colors.white)
 
         term.setCursorPos(22, 7)
-        term.write("Credits: ")
+        term.write("Dollars: ")
         term.setTextColor(colors.lime)
         term.write("\167" .. tostring(credits))
         term.setTextColor(colors.white)
@@ -583,7 +642,7 @@ function pricewon()
         term.setCursorPos(1, 11)
         centerText("Winner!")
         term.setCursorPos(22, 13)
-        centerText("Credits Won")
+        centerText("Dollars Won")
         term.setCursorPos(22, 14)
         term.setTextColor(colors.lime)
         centerText("\167" .. priceamount)
@@ -733,6 +792,10 @@ local function testRun(runs, jackpotNumber, cost)
     sleep(2)
 end
 
+--print("username: " .. username)
+--print("credits: " .. getCredits())
+--print("maxbet : " .. limit)
+--sleep(5)
 -- Start Game
 term.setBackgroundColor(colors.gray)
 term.clear()

@@ -483,6 +483,7 @@ local function loginMenu(serverName, code, serverType)
     local selectedField = "user"
     local width, height = term.getSize()
     drawTransition(colors.gray)
+    local timeoutLogin = os.startTimer(30)
     while done == false do
         term.setBackgroundColor(colors.gray)
         term.clear()
@@ -548,14 +549,15 @@ local function loginMenu(serverName, code, serverType)
             term.write(" ")
         end
         term.setCursorPos(border + 6, forth + 6)
-        term.write(loginCode)
+        --term.write("  " .. loginCode)
+        centerText(tostring(loginCode))
         term.setCursorPos(border + 1, forth + 6)
         if selectedField == "user" then
             term.setBackgroundColor(colors.green)
         else
             term.setBackgroundColor(colors.lightGray)
         end
-        print("Code:")
+        print(" Code:")
 
         term.setBackgroundColor(colors.white)
         for i = border + 6, width - border - 1, 1 do
@@ -581,28 +583,32 @@ local function loginMenu(serverName, code, serverType)
         local event, button, is_held
         repeat
             event, button, is_held = os.pullEvent()
-        until event == "mouse_click" or event == "key" or event == "userAuth"
+        until event == "mouse_click" or event == "key" or event == "userAuth" or event == "timer"
 
         if event == "key" then
             local key = button
             if key == keys.backspace then
                 cryptoNet.send(serverSocket, { "cancelLogin" })
+                done = true
             end
         elseif event == "mouse_click" then
-            --log("mouse_click x" .. tostring(x) .. " y" .. tostring(y) .. " scroll: " .. tostring(scroll))
-            if y == math.floor(height / 4) + 10 then
-                if (x > 1 and x < 7) then
-                    --cancel
+            --cancel
                     cryptoNet.send(serverSocket, { "cancelLogin" })
                     done = true
-                end
-            end
         elseif event == "userAuth" then
             local user = button
             --os.queueEvent("login", user, serverSocket)
             debugLog("userAuth")
             login(serverSocket, user, loginCode)
             done = true
+        elseif event == "timer" and button == timeoutLogin then
+            os.cancelTimer(timeoutLogin)
+                    timeoutLogin = nil
+                    print("chat login timeout")
+                    debugLog("timeoutLogin")
+                    cryptoNet.closeAll()
+                    os.reboot()
+        
         end
     end
     term.setTextColor(colors.white)
@@ -612,6 +618,8 @@ local function loginMenu(serverName, code, serverType)
 end
 
 local function connectToServer()
+    --drawTransition(colors.gray)
+    while true do 
     term.setBackgroundColor(colors.gray)
     --term.clear()
     drawTransition(colors.gray)
@@ -628,13 +636,13 @@ local function connectToServer()
     term.write("in your offhand")
     sleep(0)
     term.setCursorPos(1, 9)
-    term.write("Enter the code displayed")
+    term.write("Enter the Connect Code")
     sleep(0)
     term.setCursorPos(1, 10)
-    term.write("on the monitor")
+    term.write("displayed on the monitor")
     sleep(0)
     term.setCursorPos(1, 12)
-    term.write("Enter 0 to exit")
+    --term.write("Enter 0 to exit")
     sleep(0)
     paintutils.drawFilledBox(1, termY, 6, termY, colors.darkGrey)
     sleep(0)
@@ -649,10 +657,10 @@ local function connectToServer()
     term.setTextColor(colors.white)
 
     if code == nil then
-        return
+        --return
     elseif code == 0 or code < 1000 or code > 9999 then
-        return
-    end
+        --return
+    else
     rednet.broadcast(code)
     print("waiting for reply...")
     local id, message = rednet.receive(nil, 5)
@@ -664,20 +672,27 @@ local function connectToServer()
     else
         --term.clear()
         loadingScreen("Connecting")
+        debugLog("connecting to serverSocket")
         timeoutConnect = os.startTimer(15)
+        
         serverSocket = cryptoNet.connect(message, 30, 5)
         --timeout no longer needed
         os.cancelTimer(timeoutConnect)
         timeoutConnect = nil
+        debugLog("connected to serverSocket")
+        debugLog("controllerConnect")
         cryptoNet.send(serverSocket, { "controllerConnect" })
-        cryptoNet.send(serverSocket, { "getServerType" })
+        --[[cryptoNet.send(serverSocket, { "getServerType" })
         local event, serverType
         repeat
             event, serverType = os.pullEventRaw()
         until event == "gotServerType"
         debugLog("serverType: " .. tostring(serverType))
-        loginMenu(message, code, serverType)
+        ]]
+        loginMenu(message, code)
     end
+    end
+end
 end
 
 local function onEvent(event)
@@ -689,7 +704,8 @@ local function onEvent(event)
         print("Connection lost")
         cryptoNet.closeAll()
         os.queueEvent("exit")
-        --os.reboot()
+        sleep(2)
+        os.reboot()
     elseif event[1] == "encrypted_message" then
         local socket = event[3]
         local message = event[2][1]
@@ -819,8 +835,10 @@ if not settings.get("debug") then
     checkUpdates()
 end
 cryptoNet.setLoggingEnabled(false)
-pcall(cryptoNet.startEventLoop, onStart, onEvent)
+--pcall(cryptoNet.startEventLoop, onStart, onEvent)
+pcall(cryptoNet.startEventLoop, connectToServer, onEvent)
+
 cryptoNet.closeAll()
 if not settings.get("debug") then
     os.reboot()
-end
+end            
