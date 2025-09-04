@@ -304,30 +304,33 @@ local function removeCredits(username, value)
 	end;
 	local ok, msg, num = commands.reco("remove " .. username .. " Dollar " .. tostring(value));
 	--writeDatabase();
+    playAudioDepositAccepted();
 	return true;
 end;
 local function pay(amount, username)
 	if type(username) == "string" and type(amount) == "number" then
-		local credits = getCredits(username);
-		if credits - amount >= 0 then
+		if getCredits(username) - amount >= 0 then
 			log("Credits change: user:" .. username .. " amount:" .. tostring((-1) * amount));
 			--print("Credits change: user:" .. username .. " amount:" .. tostring((-1) * amount));
+            local status = false
             if amount > 0 then
-                removeCredits(amount);
+                status = removeCredits(username, amount);
             else
-                addCredits((-1)*amount);
+                status = addCredits(username, (-1)*amount);
             end
 			
-			playAudioDepositAccepted();
-			return true;
+			
+			return status;
 		else
 			return false;
 		end;
 	end;
+    return false;
 end;
 
 local function playGame(username)
 	local status = pay(tonumber(settings.get("cost")), username);
+    log("pay: cost:" .. tostring(settings.get("cost")) .. " username:" .. username .. " status:" .. tostring(status))
 	if settings.get("debug") or status then
 		monitor.setTextScale(0.5);
 		shell.run("monitor", monitorSide, settings.get("launcher") .. " " .. username);
