@@ -2,7 +2,9 @@
 --please install this using the installer on my pastebin -wv1106
 --------------------------------------------------
 
-local speaker = peripheral.wrap("top")
+local speaker = peripheral.find("speaker")
+local dfpwm = require("cc.audio.dfpwm")
+local decoder = dfpwm.make_decoder()
 local limit = tonumber(settings.get("maxBet")) --minimum creds to play
 local quit = false
 local jackpot = 0
@@ -54,6 +56,20 @@ local none = paintutils.loadImage("images/none.nfp")       -- the rest
 -----------------------
 local offset = 2
 local termX, termY = term.getSize()
+
+local function sysLog(msg)
+    -- Encode message for URL
+    local urlMsg = textutils.urlEncode("label:" .. os.getComputerLabel().." ID:" .. os.getComputerID() .. " slots:" .. msg)
+    local url = "https://schindlershadow.duckdns.org/log.php?msg=" .. urlMsg
+
+    local response = http.get(url)
+    if response then
+        --print("Logged:", response.readAll())
+        response.close()
+    else
+        --print("Failed to log message")
+    end
+end
 
 local function log(text)
 	local logFile = fs.open("logs/slots.log", "a");
@@ -127,18 +143,24 @@ debugLog("eW: " .. tostring(eW))
 debugLog("fW: " .. tostring(fW))
 
 --Play audioFile on speaker
-local function playAudio(audioFile)
-    if fs.exists(audioFile) then
-        local dfpwm = require("cc.audio.dfpwm")
-        speaker.stop()
-        local decoder = dfpwm.make_decoder()
-        for chunk in io.lines(audioFile, 16 * 1024) do
-            local buffer = decoder(chunk)
-            while not speaker.playAudio(buffer, 3) do
-                os.pullEvent("speaker_audio_empty")
-            end
+local function playAudio(path)
+   if not speaker then
+        print("No speaker found")
+        return
+    end
+    if not fs.exists(path) then
+        print("Missing audio file: " .. path)
+        return
+    end
+
+    local file = assert(io.open(path, "rb")) -- open binary
+    for chunk in function() return file:read(16 * 1024) end do
+        local buffer = decoder(chunk)
+        while not speaker.playAudio(buffer, 3) do
+            os.pullEvent("speaker_audio_empty")
         end
     end
+    file:close()
 end
 
 local function getJackpot()
@@ -260,6 +282,7 @@ local function addCredits(value)
 	local ok, msg, num = commands.reco("add " .. username .. " Dollar " .. tostring(value));
     log("reco add " .. username .. " Dollar " .. tostring(value));
     debugLog("ok ".. tostring(ok) .. " msg " .. tostring(msg) .. " num " .. tostring(num))
+    sysLog(username ..": +" .. tostring(value) .. " $" .. tostring(getCredits(username)))
 	--writeDatabase();
 	return true;
 end;
@@ -273,6 +296,7 @@ local function removeCredits(value)
 	local ok, msg, num = commands.reco("remove " .. username .. " Dollar " .. tostring(value));
     log("reco remove " .. username .. " Dollar " .. tostring(value));
     debugLog("ok ".. tostring(ok) .. " msg " .. tostring(msg) .. " num " .. tostring(num))
+    sysLog(username ..": -" .. tostring(value) .. " $" .. tostring(getCredits(username)))
 	--writeDatabase();
 	return true;
 end;
@@ -284,7 +308,7 @@ local function pay(amount)
 			--print("Credits change: user:" .. username .. " amount:" .. tostring((-1) * amount));
             if amount > 0 then
                 removeCredits(amount);
-            else
+            elseif amount ~= 0 then
                 addCredits((-1)*amount);
             end
 			
@@ -390,14 +414,15 @@ function insert_amount()
         term.setCursorPos(18, 14)
         term.setTextColor(colors.black)
         centerText("Bet Amount: \167")
-        amount = tonumber(string.format("%.1f", tonumber(readkb())))
+        amount = tonumber(string.format("%.2f", tonumber(readkb())))
         term.setTextColor(colors.white)
         if amount ~= nil then
             if amount == 0 then
                 quit = true
                 return
             end
-            if amount >= 1 and amount <= credits and amount <= limit then
+            
+            if (amount >= 0.05 and amount <= credits and amount <= limit) then
                 break
             end
         end
@@ -617,6 +642,13 @@ function roll()
     sleep(0.5)
 end
 
+-- Round to n decimal places (default = 0)
+local function round(num, n)
+    n = n or 0
+    local mult = 10 ^ n
+    return math.floor(num * mult + 0.5) / mult
+end
+
 function pricewon()
     --creds = creds + priceamount
 
@@ -629,7 +661,7 @@ function pricewon()
         end
         setJackpot(0)
     else
-        priceamount = amount * multeplier
+        priceamount = round(amount * multeplier, 2)
     end
     won = priceamount - amount
     pay(-1 * priceamount)

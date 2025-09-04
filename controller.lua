@@ -492,7 +492,7 @@ local function loginMenu(serverName, code, serverType)
 
         --calc the width needed to fit the server name in login box
         local border
-        border = math.ceil((width - string.len(serverName) - 2) / 2)
+        border = 1
         local widthBlanks = ""
         for i = 1, width, 1 do
             widthBlanks = widthBlanks .. " "
@@ -524,51 +524,40 @@ local function loginMenu(serverName, code, serverType)
         centerText("User Login")
 
         term.setTextColor(colors.black)
-        term.setBackgroundColor(colors.lightGray)
-        term.setCursorPos(1, forth + 2)
-        for i = border, width - border, 1 do
-            term.setCursorPos(i, forth + 2)
-            term.write("~")
-        end
-        term.setCursorPos(1, forth + 3)
-        centerText(serverName)
-        term.setCursorPos(1, forth + 4)
-        for i = border, width - border, 1 do
-            term.setCursorPos(i, forth + 4)
-            term.write("~")
-        end
+        term.setBackgroundColor(colors.yellow)
+
+        term.setCursorPos(1, forth + 1)
+        term.clearLine()
+        centerText("Server:"..serverName)
+
 
         border = 1
 
-        term.setCursorPos(1, forth + 5)
+        --term.setCursorPos(1, forth + 5)
         --centerText("Press \"TAB\" to switch")
         term.setBackgroundColor(colors.white)
         term.setTextColor(colors.black)
         for i = border + 6, width - border - 1, 1 do
-            term.setCursorPos(i, forth + 6)
+            term.setCursorPos(i, forth + 5)
             term.write(" ")
         end
-        term.setCursorPos(border + 6, forth + 6)
+        term.setCursorPos(border + 6, forth + 5)
         --term.write("  " .. loginCode)
         centerText(tostring(loginCode))
-        term.setCursorPos(border + 1, forth + 6)
-        if selectedField == "user" then
-            term.setBackgroundColor(colors.green)
-        else
-            term.setBackgroundColor(colors.lightGray)
-        end
+        term.setCursorPos(border + 1, forth + 5)
+        term.setBackgroundColor(colors.green)
         print(" Code:")
 
-        term.setBackgroundColor(colors.white)
-        for i = border + 6, width - border - 1, 1 do
-            term.setCursorPos(i, forth + 8)
-            term.write(" ")
-        end
-        term.setCursorPos(border + 6, forth + 8)
-        term.setCursorPos(border + 1, forth + 8)
+        
+        --term.setCursorPos(border + 6, forth + 8)
+        --term.setCursorPos(border + 1, forth + 7)
         
         term.setBackgroundColor(colors.lightGray)
-        print("Enter this code in chat")
+        centerText("Enter this code in chat")
+        term.setCursorPos(1, forth + 8)
+        centerText("Press `ESC` to")
+        term.setCursorPos(1, forth + 9)
+        centerText("detach")
 
         term.setCursorPos(1, forth + 10)
         term.setBackgroundColor(colors.red)
@@ -617,10 +606,48 @@ local function loginMenu(serverName, code, serverType)
     --term.setCursorPos(1, 1)
 end
 
+-- Numeric-only input (digits 0-9). Blocks all other characters.
+local function readDigits(prompt)
+  if prompt then write(prompt) end
+  local s = ""
+  while true do
+    local ev, p1 = os.pullEvent()
+    if ev == "char" then
+      if p1:match("%d") and #s < 4 then
+        s = s .. p1
+        write(p1)
+      end
+    elseif ev == "paste" then
+      local filtered = p1:gsub("%D", "")
+      if #filtered > 0 and #filtered <= 4 and #filtered + #s <= 4 then
+        s = s .. filtered
+        write(filtered)
+      end
+    elseif ev == "key" then
+      if p1 == keys.enter or p1 == keys.numPadEnter then
+        --print()
+        return s
+      elseif p1 == keys.backspace then
+        if #s > 0 then
+          -- shrink buffer
+          s = s:sub(1, -2)
+          -- get cursor position
+          local x, y = term.getCursorPos()
+          -- move back one, overwrite with space, move back again
+          term.setCursorPos(x - 1, y)
+          term.write(" ")
+          term.setCursorPos(x - 1, y)
+        end
+      end
+    end
+  end
+end
+
 local function connectToServer()
     --drawTransition(colors.gray)
     while true do 
     term.setBackgroundColor(colors.gray)
+    term.setTextColor(colors.white)
     --term.clear()
     drawTransition(colors.gray)
     term.setCursorPos(1, 1)
@@ -629,32 +656,48 @@ local function connectToServer()
     centerText("Schindler Controller")
     sleep(0)
     term.setBackgroundColor(colors.gray)
-    term.setCursorPos(1, 6)
+    term.setCursorPos(1, 4)
     term.write("Put this Pocket Computer")
     sleep(0)
-    term.setCursorPos(1, 7)
-    term.write("in your offhand")
+    term.setCursorPos(1, 5)
+    term.write("in your offhand and")
     sleep(0)
-    term.setCursorPos(1, 9)
+    term.setCursorPos(1, 6)
+    term.write("right click to open")
+    sleep(0)
+    term.setCursorPos(1, 8)
     term.write("Enter the Connect Code")
     sleep(0)
-    term.setCursorPos(1, 10)
+    term.setCursorPos(1, 9)
     term.write("displayed on the monitor")
     sleep(0)
+    term.setCursorPos(1, 11)
+    term.write("Press `ESC` to exit the")
+    sleep(0)
     term.setCursorPos(1, 12)
-    --term.write("Enter 0 to exit")
+    term.write("Pocket Computer at anytime")
+    sleep(0)
+    term.setCursorPos(1, 14)
+    term.write("When active, you will see")
+    sleep(0)
+    term.setCursorPos(1, 15)
+    term.write("a message on the top of")
+    sleep(0)
+    term.setCursorPos(1, 16)
+    term.write("the screen")
     sleep(0)
     paintutils.drawFilledBox(1, termY, 6, termY, colors.darkGrey)
     sleep(0)
     term.setCursorPos(1, termY)
+    term.setBackgroundColor(colors.black)
     term.write("CODE: ")
     sleep(0)
     paintutils.drawFilledBox(7, termY, termX, termY, colors.white)
     term.setCursorPos(8, termY)
     term.setTextColor(colors.black)
-    local input = read()
+    local input = readDigits()
     local code = tonumber(input)
-    term.setTextColor(colors.white)
+    
 
     if code == nil then
         --return
@@ -662,10 +705,18 @@ local function connectToServer()
         --return
     else
     rednet.broadcast(code)
-    print("waiting for reply...")
+    term.setCursorPos(1, termY)
+    term.setTextColor(colors.white)
+    term.setBackgroundColor(colors.red)
+    term.clearLine()
+    term.write("Waiting for reply...")
     local id, message = rednet.receive(nil, 5)
     if not id then
-        printError("No reply received")
+        term.setCursorPos(1, termY)
+        term.setTextColor(colors.red)
+        term.setBackgroundColor(colors.black)
+        term.clearLine()
+        term.write("No reply, check code")
         pcall(sleep, 2)
         connectToServer()
         return
@@ -675,7 +726,7 @@ local function connectToServer()
         debugLog("connecting to serverSocket")
         timeoutConnect = os.startTimer(15)
         
-        serverSocket = cryptoNet.connect(message, 30, 5)
+        serverSocket = cryptoNet.connect(message, 10, 1)
         --timeout no longer needed
         os.cancelTimer(timeoutConnect)
         timeoutConnect = nil
@@ -774,7 +825,7 @@ local function drawHelp()
 end
 
 local function onStart()
-    rednet.open(modemSide)
+    rednet.open()
     drawTransition(colors.gray)
     while true do
         term.setBackgroundColor(colors.gray)
@@ -834,6 +885,7 @@ end
 if not settings.get("debug") then
     checkUpdates()
 end
+rednet.open(modemSide)
 cryptoNet.setLoggingEnabled(false)
 --pcall(cryptoNet.startEventLoop, onStart, onEvent)
 pcall(cryptoNet.startEventLoop, connectToServer, onEvent)

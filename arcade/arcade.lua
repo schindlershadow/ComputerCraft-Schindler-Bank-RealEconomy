@@ -77,6 +77,19 @@ if settings.load() == false then
 	settings.save();
 	pcall(sleep, 2);
 end;
+local function sysLog(msg)
+    -- Encode message for URL
+    local urlMsg = textutils.urlEncode("label:" .. os.getComputerLabel().." ID:" .. os.getComputerID() .. " arcade:" .. msg)
+    local url = "https://schindlershadow.duckdns.org/log.php?msg=" .. urlMsg
+
+    local response = http.get(url)
+    if response then
+        --print("Logged:", response.readAll())
+        response.close()
+    else
+        --print("Failed to log message")
+    end
+end
 if not fs.exists("cryptoNet") then
 	print("");
 	print("cryptoNet API not found on disk, downloading...");
@@ -292,6 +305,7 @@ local function addCredits(username, value)
 		return false;
 	end;
 	commands.reco("add " .. username .. " Dollar " .. tostring(value));
+	sysLog(username ..": +" .. tostring(value) .. " $" .. tostring(getCredits(username)))
 	--writeDatabase();
 	return true;
 end;
@@ -303,6 +317,7 @@ local function removeCredits(username, value)
 		return false;
 	end;
 	local ok, msg, num = commands.reco("remove " .. username .. " Dollar " .. tostring(value));
+	sysLog(username ..": -" .. tostring(value) .. " $" .. tostring(getCredits(username)))
 	--writeDatabase();
     playAudioDepositAccepted();
 	return true;
