@@ -307,6 +307,26 @@ local function stopControllerTimer()
 	os.cancelTimer(controllerTimer);
 	controllerTimer = nil;
 end;
+local function truncate(num, decimals)
+    local mult = 10 ^ (decimals or 0)
+    return math.floor(num * mult) / mult
+end
+local function hasMoreThanTwoDecimals(value)
+    local s = tostring(value)
+    local dot = s:find("%.")
+    if not dot then
+        return false -- no decimal point at all
+    end
+    local decimals = #s - dot
+    return decimals > 2
+end
+local function setCredits(username, value)
+	if type(value) ~= "number" then
+		return false;
+	end;
+	commands.reco("set " .. username .. " Dollar " .. tostring(value));
+	return true;
+end;
 local function getCredits(username)
 	if type(username) ~= "string" then
 		return 0;
@@ -315,6 +335,11 @@ local function getCredits(username)
 	for _, line in ipairs(out) do
 		local amt = line:match("([%d%.]+)");
 		if amt then
+			if hasMoreThanTwoDecimals((amt)) then
+				amt = truncate(tonumber(amt), 2)
+				setCredits(username, tonumber(amt));
+				sendToast(username, "Balance Truncated - Arcade: " .. tostring(os.getComputerLabel()), "Balance set to $" .. tostring(amt));
+			end
 			credits = tonumber(amt);
 			return tonumber(amt);
 		end;

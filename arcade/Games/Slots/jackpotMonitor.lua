@@ -11,6 +11,18 @@ local jackpot = 0
 monitor.setTextScale(2)
 local monitorX, monitorY = monitor.getSize()
 
+local function getMonitor()
+    local monitor = peripheral.wrap(settings.get("startupMonitor"))
+    if monitor then
+        monitor.setTextScale(2)
+        monitorX, monitorY = monitor.getSize()
+    elseif monitor == nil then
+        error(settings.get("startupMonitor") .. " peripheral returned nil!")
+        return
+    end
+    return monitor
+end
+
 local function getJackpot()
     if fs.exists("jackpot") then
         local file = fs.open("jackpot", "r")
@@ -41,6 +53,7 @@ end
 local blue = true
 local textColor = colors.red
 while true do
+    monitor = getMonitor()
     getJackpot()
     if blue then
         monitor.setBackgroundColor(colors.blue)

@@ -66,6 +66,11 @@ end;
 if fs.exists("logs/slots.log") then
 	fs.delete("logs/slots.log");
 end;
+local function round(num, n)
+	n = n or 0;
+	local mult = 10 ^ n;
+	return math.floor((num * mult + 0.5)) / mult;
+end;
 local function centerText(text)
 	if term ~= nil then
 		if text == nil then
@@ -187,7 +192,7 @@ local function getJackpot()
 	end;
 end;
 local function setJackpot(number)
-	number = math.floor(number);
+	number = round(number,2);
 	if fs.exists("jackpot") then
 		fs.delete("jackpot");
 	end;
@@ -258,6 +263,26 @@ local function drawNoCredits()
 	term.setTextColor(colors.white);
 	sleep(5);
 end;
+local function truncate(num, decimals)
+    local mult = 10 ^ (decimals or 0)
+    return math.floor(num * mult) / mult
+end
+local function hasMoreThanTwoDecimals(value)
+    local s = tostring(value)
+    local dot = s:find("%.")
+    if not dot then
+        return false -- no decimal point at all
+    end
+    local decimals = #s - dot
+    return decimals > 2
+end
+local function setCredits(username, value)
+	if type(value) ~= "number" then
+		return false;
+	end;
+	commands.reco("set " .. username .. " Dollar " .. tostring(value));
+	return true;
+end;
 local function getCredits()
 	if type(username) ~= "string" then
 		return 0;
@@ -266,6 +291,11 @@ local function getCredits()
 	for _, line in ipairs(out) do
 		local amt = line:match("([%d%.]+)");
 		if amt then
+            if hasMoreThanTwoDecimals((amt)) then
+				amt = truncate(tonumber(amt), 2)
+				setCredits(username, tonumber(amt));
+				sendToast(username, "Balance Truncated - Slots: " .. tostring(os.getComputerLabel()), "Balance set to $" .. tostring(amt));
+			end
 			credits = tonumber(amt);
 			return amt;
 		end;
@@ -617,11 +647,6 @@ function roll()
 	end;
 	playAudio("row.dfpwm");
 	sleep(0.5);
-end;
-local function round(num, n)
-	n = n or 0;
-	local mult = 10 ^ n;
-	return math.floor((num * mult + 0.5)) / mult;
 end;
 function pricewon()
 	if multeplier == 2 and amount >= limit / 2 then
