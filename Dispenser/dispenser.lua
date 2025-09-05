@@ -123,14 +123,14 @@ end
 
 -- Returns true if any player is within maxDistance
 local function playersNearby(maxDistance)
-    local detector = peripheral.find("player_detector")
+    local detector = peripheral.find("player_detector") -- or wrap("back") if you know the side
     if not detector then 
         print("No player detector found!")
         return false 
     end
 
-    local players = detector.getPlayersInRange(maxDistance or 16) -- returns a table of player names
-    return #players > 0
+    local players = detector.isPlayersInRange(maxDistance or 16) 
+    return players
 end
 
 local function pullDisk(slot)

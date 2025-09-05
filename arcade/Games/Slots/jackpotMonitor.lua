@@ -44,8 +44,8 @@ local function playersNearby(maxDistance)
         return false 
     end
 
-    local players = detector.getPlayersInRange(maxDistance or 16) -- returns a table of player names
-    return #players > 0
+    local players = detector.isPlayersInRange(maxDistance or 16)
+    return players
 end
 
 local blue = true
