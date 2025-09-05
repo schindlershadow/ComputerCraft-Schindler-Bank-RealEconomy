@@ -11,18 +11,6 @@ local jackpot = 0
 monitor.setTextScale(2)
 local monitorX, monitorY = monitor.getSize()
 
-local function getMonitor()
-    local monitor = peripheral.wrap(settings.get("startupMonitor"))
-    if monitor then
-        monitor.setTextScale(2)
-        monitorX, monitorY = monitor.getSize()
-    elseif monitor == nil then
-        error(settings.get("startupMonitor") .. " peripheral returned nil!")
-        return
-    end
-    return monitor
-end
-
 local function getJackpot()
     if fs.exists("jackpot") then
         local file = fs.open("jackpot", "r")
@@ -48,12 +36,22 @@ local function centerText(text)
     monitor.write(text)
 end
 
+-- Returns true if any player is within maxDistance
+local function playersNearby(maxDistance)
+    local detector = peripheral.find("player_detector") -- or wrap("back") if you know the side
+    if not detector then 
+        print("No player detector found!")
+        return false 
+    end
 
+    local players = detector.getPlayersInRange(maxDistance or 16) -- returns a table of player names
+    return #players > 0
+end
 
 local blue = true
 local textColor = colors.red
 while true do
-    monitor = getMonitor()
+    if playersNearby() then
     getJackpot()
     if blue then
         monitor.setBackgroundColor(colors.blue)
@@ -74,5 +72,7 @@ while true do
     centerText("\167" .. tostring(jackpot))
     monitor.setCursorPos(1, 3)
     monitor.setTextColor(colors.yellow)
+    end
     sleep(5)
+    
 end

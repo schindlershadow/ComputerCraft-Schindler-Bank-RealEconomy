@@ -121,6 +121,17 @@ local function debugLog(text)
     end
 end
 
+-- Returns true if any player is within maxDistance
+local function playersNearby(maxDistance)
+    local detector = peripheral.find("player_detector")
+    if not detector then 
+        print("No player detector found!")
+        return false 
+    end
+
+    local players = detector.getPlayersInRange(maxDistance or 16) -- returns a table of player names
+    return #players > 0
+end
 
 local function pullDisk(slot)
     if hopper ~= nil and diskdrive ~= nil then
@@ -204,6 +215,7 @@ local function drawTransition(color)
 end
 
 local function loadingScreen(text)
+    if playersNearby() then
     if type(text) == nil then
         text = ""
     end
@@ -215,6 +227,7 @@ local function loadingScreen(text)
     monitor.setCursorPos(1, 4)
     centerText("Loading...")
     monitor.setCursorPos(1, 6)
+end
 end
 
 local function drawScreen(text)
@@ -386,6 +399,7 @@ local function drawMonitor()
     monitor.setCursorPos(1, 1)
     drawTransition(colors.blue)
     while true do
+        if playersNearby() then
         --code = math.random(1000, 9999)
         --print("code: " .. tostring(code))
         monitor.setBackgroundColor(colors.blue)
@@ -413,6 +427,7 @@ local function drawMonitor()
 
         --codeServer()
         --loginScreen()
+        end
         sleep(5)
     end
 end
