@@ -161,7 +161,7 @@ local function addCredits(value)
     --log("reco add " .. username .. " Dollar " .. tostring(value));
     --debugLog("ok ".. tostring(ok) .. " msg " .. tostring(msg) .. " num " .. tostring(num))
     sysLog(username ..": +" .. tostring(value) .. " $" .. tostring(getCredits(username)))
-    sendToast(username, "Payment Processed - Arcade: " .. tostring(os.getComputerLabel()), "+$" .. tostring(value) .. " for " .. settings.get("gameName"));
+    sendToast(username, "Payment Processed - BlackJack: " .. tostring(os.getComputerLabel()), "+$" .. tostring(value) .. " for " .. settings.get("gameName"));
 	--writeDatabase();
 	return true;
 end;
@@ -177,7 +177,7 @@ local function removeCredits(value)
     --log("reco remove " .. username .. " Dollar " .. tostring(value));
     --debugLog("ok ".. tostring(ok) .. " msg " .. tostring(msg) .. " num " .. tostring(num))
     sysLog(username ..": -" .. tostring(value) .. " $" .. tostring(getCredits(username)))
-    sendToast(username, "Payment Processed - Arcade: " .. tostring(os.getComputerLabel()), "-$" .. tostring(value) .. " for " .. settings.get("gameName"));
+    sendToast(username, "Payment Processed - BlackJack: " .. tostring(os.getComputerLabel()), "-$" .. tostring(value) .. " for " .. settings.get("gameName"));
 	--writeDatabase();
 	return true;
 end;
